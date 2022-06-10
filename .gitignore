@@ -2,6 +2,7 @@
 old/
 *.geany
 *.project
+*.geanywb
 mon_env/
 
 bests/

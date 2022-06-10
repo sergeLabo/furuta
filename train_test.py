@@ -38,7 +38,7 @@ class TrainTest:
         self.vf_coef = float(self.config[self.numero]['vf_coef'])
         self.max_grad_norm = float(self.config[self.numero]['max_grad_norm'])
 
-        self.model_name = f"ppo_cuda_{self.numero}"
+        self.model_name = f"ppo_neo_{self.numero}"
         print(f"Nom du model {self.model_name}")
         self.env = FurutaEnv(self.config_obj, self.numero)
         self.model = None
