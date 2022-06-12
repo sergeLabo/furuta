@@ -37,6 +37,7 @@ class TrainTest:
         self.ent_coef = float(self.config[self.numero]['ent_coef'])
         self.vf_coef = float(self.config[self.numero]['vf_coef'])
         self.max_grad_norm = float(self.config[self.numero]['max_grad_norm'])
+        self.best =int(self.config[self.numero]['best'])
 
         self.model_name = f"ppo_neo_{self.numero}"
         print(f"Nom du model {self.model_name}")
@@ -223,17 +224,18 @@ class TrainTest:
         batch = int(self.config[self.numero]['batch'])
 
         # Temps en secondes du train complet. x Hz
-        t = batch * TIMESTEPS / 33.3
+        t = batch * TIMESTEPS / 14
         f = datetime.now() + timedelta(seconds=t)
         fin = f.strftime("%d-%m-%Y | %H:%M")
         print(f"\nFin à {fin}\n")
 
-        # # eval_callback = EvalCallback(self.env,
-                                     # # best_model_save_path=self.best_model_save_path,
-                                     # # log_path=self.logdir,
-                                     # # eval_freq=500,
-                                     # # deterministic=True,
-                                     # # render=False)
+        if self.best:
+            eval_callback = EvalCallback(self.env,
+                                         best_model_save_path=self.best_model_save_path,
+                                         log_path=self.logdir,
+                                         eval_freq=500,
+                                         deterministic=True,
+                                         render=False)
 
         for i in range(batch):
 
@@ -243,10 +245,21 @@ class TrainTest:
                  f"Learning steps = {self.learning_steps} Steps par cycle = "
                  f"{self.env.step_maxi} à {dt}\n")
 
-            self.model.learn(total_timesteps=TIMESTEPS,
-                             reset_num_timesteps=False,
-                             tb_log_name=f"PPO{self.numero}")  #,
-                             # # callback=eval_callback)
+            try:
+                # # if not self.best:
+                self.model.learn(total_timesteps=TIMESTEPS,
+                                 reset_num_timesteps=False,
+                                 tb_log_name=f"PPO{self.numero}")
+                # # else:
+                    # # self.model.learn(total_timesteps=TIMESTEPS,
+                                     # # reset_num_timesteps=False,
+                                     # # tb_log_name=f"PPO{self.numero}",
+                                     # # callback=eval_callback)
+            except:
+                print(f"Soit vous avez interrompu l'apprentissage avec Echap,\n"
+                        f"   soit vous avez un problème que vous allez devoir résoudre!")
+                sleep(2)
+                os._exit(0)
 
             self.model.save(f"{self.models_dir}/{TIMESTEPS*i}")
 

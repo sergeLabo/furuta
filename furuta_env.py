@@ -9,66 +9,17 @@ from datetime import datetime
 import json
 
 import numpy as np
-from pynput import keyboard
 import gym
 from gym import spaces
 
 from my_config import MyConfig
 from furuta import Furuta
-
-
-
-class Clavier:
-    """Echap pour quitter proprement.
-
-        Echap = Quit
-        a right
-        z left
-    """
-
-    def __init__(self):
-        self.key = None
-        self.quit = 0
-        self.a = 0
-        self.z = 0
-        self.j = 0
-        self.k = 0
-
-        self.listener = keyboard.Listener(on_press=self.on_press,
-                                     on_release=self.on_release)
-        self.listener.start()
-
-    def on_press(self, key):
-        try:
-            self.key = key.char
-            if self.key == "a":  # moteur à droite
-                self.a = 1
-            if self.key == "z":  # moteur à gauche
-                self.z = 1
-            if self.key == "j":  # print
-                if self.j == 0:
-                    self.j = 1
-                else:
-                    self.j = 0
-            if self.key == "k":  # print
-                if self.k == 0:
-                    self.k = 1
-                else:
-                    self.k = 0
-        except AttributeError:
-            pass
-
-    def on_release(self, key):
-        if key == keyboard.Key.esc:
-            print("Stop keyboard listener: quit ...")
-            self.quit = 1
-            return False
-
+from clavier import Clavier
 
 
 class FurutaEnv(gym.Env):
     """step: observation, calcul d'IA, action et on recommence
-    cycle: 2000 steps
+    cycle: 2046 steps
     alpha: angle du chariot en rd
     teta: angle du balancier en rd
     vitesse angulaire en rd/s
@@ -90,8 +41,8 @@ class FurutaEnv(gym.Env):
         self.furuta = Furuta(config_obj, numero, self.clavier)
 
         # en radian dans le furuta.ini
-        self.alpha_maxi_R = float(self.config[self.numero]['alpha_maxi_r'])
-        self.alpha_maxi_L = float(self.config[self.numero]['alpha_maxi_l'])
+        self.alpha_maxi_r = float(self.config[self.numero]['alpha_maxi_r'])
+        self.alpha_maxi_l = float(self.config[self.numero]['alpha_maxi_l'])
 
         # Valeur par défaut
         self.alpha = 0
@@ -105,13 +56,13 @@ class FurutaEnv(gym.Env):
         self.puissance_maxi = int(ratio_puissance_maxi * range_pwm)
 
         # Durée de l'impulsion sur le moteur
-        self.lenght = float(self.config[self.numero]['lenght_impulsion'])
+        self.lenght = float(self.config[self.numero]['duration_of_motor_impulse'])
 
         # Nombre de steps maxi par cycle
         self.step_maxi = int(self.config[self.numero]['step_maxi'])
         self.learning_steps = int(self.config[self.numero]['learning_steps'])
 
-        # Attente entre impulsion et observation
+        # Attente entre la fin de l'impulsion et observation
         self.tempo = float(self.config[self.numero]['tempo_step'])
 
         # Nombre total de step
@@ -137,6 +88,85 @@ class FurutaEnv(gym.Env):
 
         # Debug
         self.synchro = ""
+
+    # # def step(self, action):
+        # # """Pour pouvoir arrêter en cours d'apprentissage sans erreur!"""
+        # # if not self.clavier.quit:
+            # # return self.step_(action)
+        # # else:
+            # # print("quit en cours ...")
+            # # self.close()
+
+    def step(self, action):
+        """Un step dans un cycle
+                * action sur le moteur, défini par model.learn()
+                * attente
+                * observation de l'état
+                    soit postion et vitesse du chariot et du balancier
+                * calcul de la récompense
+
+            Arrêt du cycle si:
+                * step_maxi atteint
+                * chariot en bout de course
+        """
+        if self.clavier.quit:
+            self.close()
+
+        # Si action de 0 à 160, impulsion de -80 à 80, sens left si < 0
+        puissance = int(action - self.puissance_maxi)
+
+        if puissance < 0:
+            sens = 'left'
+        else:
+            sens = 'right'
+        puissance = abs(puissance)
+
+        if self.furuta:  # pour ne pas demander d'impulsion si quit !
+            self.furuta.impulsion_moteur(puissance, self.lenght, sens)
+
+        # Attente, le temps total entre début impulsion et observation est
+        # duration_of_motor_impulse + self.tempo
+        sleep(self.tempo)
+
+        # Demande d'une observation
+        obs = self.furuta.shot()
+        if obs is not None:
+            self.alpha, self.alpha_dot, self.teta, self.teta_dot = obs
+        else:
+            self.alpha, self.alpha_dot, self.teta, self.teta_dot = 0, 0, 0, 0
+
+        # Si done est True, arrêt du cycle
+        done = False
+
+        # Done avec step_maxi atteint
+        if self.current_step > self.step_maxi:
+            done = True
+            self.reason = f"Step maxi"
+
+        # Done avec chariot trop loin
+        if self.alpha < -self.alpha_maxi_r or self.alpha > self.alpha_maxi_l:
+            done = True
+            self.reason = f"alpha = {self.alpha:.2f}"
+            #self.furuta.recentering()
+
+        rewards = self.get_reward()
+        self.cycle_reward += rewards
+
+        # Observation de l'état: alpha = chariot, teta = balancier
+        obs = np.array([np.float(self.alpha),
+                        np.float(self.alpha_dot),
+                        np.float(np.cos(self.teta)),
+                        np.float(np.sin(self.teta)),
+                        np.float(self.teta_dot)])
+
+        # Pour affichage d'infos
+        self.current_step += 1
+        self.step_total += 1
+        self.batch_step += 1
+        self.save_efficiency()
+        self.print_infos(action, puissance, rewards, sens)
+
+        return obs, rewards, done, {}
 
     def get_spaces(self):
         """Définition des espaces:
@@ -166,14 +196,13 @@ class FurutaEnv(gym.Env):
         return observation_space, action_space
 
     def reset(self):
-        """Fin d'un cycle
-        Crée des positions et vitesses aléatoires,
-        retourne l'observation à la fin  du reset.
-        Définition de l'état des chariot/balancier por un nouveau cycle
-        Début d'un nouveau cycle
+        """Reset à la fin d'un cycle:
+            - Donne des infos sur le cycle terminé,
+            - Crée des positions et vitesses aléatoires,
+            - Retourne l'observation à la fin  du reset.
         """
 
-        # # self.furuta.recentering()
+        #self.furuta.recentering()
         # Attente pour que le chariot ait le temps de se recenter
         sleep(0.1)
 
@@ -206,6 +235,7 @@ class FurutaEnv(gym.Env):
 
     def save_efficiency(self):
         """Enregistrement de * step_total, cycle_reward"""
+
         if self.step_total % 10000 == 9999:
             if self.datas:
                 dt_now = datetime.now()
@@ -217,118 +247,48 @@ class FurutaEnv(gym.Env):
                     f.write(d)
                 self.datas = []
 
-    def step(self, action):
-        """Un step dans un cycle
-                * action sur le moteur
-                * attente
-                * observation de l'état
-                    soit postion et vitesse du chariot et du balancier
-                * calcul de la récompense
-
-            Arrêt du cycle si:
-                * step_maxi atteint
-                * chariot en bout de course
+    def print_infos(self, action, puissance, rewards, sens):
+        """Affichage d'infos:
+            - j pour les événements à chaque step
+            - k pour alpha, teta, alpha', teta' en gros pour video
         """
-        if self.clavier.quit:
-            self.close()
-
-        # Temps de step
-        t0 = time()
-
-        # Si action de 0 à 160, impulsion de -80 à 80, sens left si < 0
-        puissance = int(action - self.puissance_maxi)
-
-        if puissance < 0:
-            sens = 'left'
-        else:
-            sens = 'right'
-        puissance = abs(puissance)
-
-        if self.furuta:  # pour ne pas demander d'impulsion si quit !
-            self.furuta.impulsion_moteur(puissance, self.lenght, sens)
-
-        # Attente, qui doit être plus grande que self.lenght
-        sleep(self.tempo)
-
-        if self.clavier.k:
-            t1 = time()
-            print(f"Durée imulsion + attente = {round((t1-t0), 3)}")
-            # Demande d'une observation
-            self.alpha, self.alpha_dot, self.teta, self.teta_dot = self.furuta.shot()
-            t2 = time()
-            print(f"Durée d'obtention d'une observation = {round((t2-t1), 3)}")
-
-        # Si done est True, arrêt du cycle
-        done = False
-
-        # Done avec step_maxi atteint
-        if self.current_step > self.step_maxi:
-            done = True
-            self.reason = f"Step maxi"
-
-        # Done avec chariot trop loin
-        # # if self.alpha < -self.alpha_maxi_R or self.alpha > self.alpha_maxi_L:
-            # # done = True
-            # # self.reason = f"alpha = {self.alpha:.2f}"
-
-        rewards = self.get_reward()
-        self.cycle_reward += rewards
-
         if self.clavier.j:
             tttt = int((time_ns() - self.t_step)/1000000)
             self.t_step = time_ns()
             a = round(self.alpha, 3)
-            sa = round(np.sin(self.alpha), 3)
+            ca = round(np.cos(self.alpha/2), 3)
             t = round(self.teta, 3)
-            st = round(np.sin(self.teta), 3)
-            ct = round(np.cos(self.teta), 3)
+            st = round(np.sin(self.teta/2), 3)
             va = int(self.alpha_dot)
             vt = int(self.teta_dot)
             if sens == 'left': sens = 'left '
 
             print(f"Num {self.current_step:^7} "
                   f"action {action:^4}  puissance {puissance:^6} "
-                  f"sens {sens} "
+                  f"sens {sens}    "
                   f"alpha {a:^7} teta {t:^7} "
-                  f"sin_alpha {sa:^7}"
-                  f"sin_teta {st:^7} cos_teta {ct:^7} "
-                  f"vitesse_alpha {va:^9} vitesse_teta {vt:^9} "
+                  f"cos_alpha/2 {ca:^7}"
+                  f"sin_teta/2 {st:^7} "
                   f"rewards {round(rewards, 3):^6} "
-                  f"Step {self.current_step:^6} {self.synchro} "
+                  f"vitesse_alpha {va:^9} vitesse_teta {vt:^9} "
                   f"Durée {tttt:^4}")
-
-        # Observation de l'état: alpha = chariot, teta = balancier
-        obs = np.array([np.float(self.alpha),
-                        np.float(self.alpha_dot),
-                        np.float(np.cos(self.teta)),
-                        np.float(np.sin(self.teta)),
-                        np.float(self.teta_dot)])
-
-        self.current_step += 1
-        self.step_total += 1
-        self.batch_step += 1
-        self.save_efficiency()
-
-        return obs, rewards, done, {}
+        if self.clavier.l:
+            a = round(self.alpha, 3)
+            t = round(self.teta, 3)
+            va = int(self.alpha_dot)
+            vt = int(self.teta_dot)
+            print(f"a: {a:^7} t: {t:^7} va: {va:^7} vt: {vt:^7} ")
 
     def get_reward(self):
         """Calcul de la récompense.
-        Chariot: 1 au centre, 0 au bout
-            *
+        Chariot:
+            * 1 au centre, 0 au bout
         Balancier: 0 en bas, 1 en haut
             * en bas teta = 0
             * en haut teta = +- 180° = +- pi = +- 3.14159
         """
         # Chariot
-        # alpha négatif à droite, positif à gauche
-        if self.alpha < 0:  # droite
-            alpha_maxi = self.alpha_maxi_R
-        else:
-            alpha_maxi = self.alpha_maxi_L
-
-        # Rapporté à la partie d'angle
-        alpha_cor = (self.alpha * (np.pi/2)) / (alpha_maxi)
-        reward_alpha = np.cos(alpha_cor)
+        reward_alpha = np.cos(self.alpha/2)
 
         # Balancier
         # 0 ou 2pi --> 1
@@ -341,13 +301,11 @@ class FurutaEnv(gym.Env):
         return reward
 
     def render(self):
-        """Doit exister pour gym"""
+        """Doit exister pour gym ?"""
+        # TODO
         pass
 
     def close(self):
         print("Close environnement.")
         self.furuta.quit()
-        sleep(1)
-        self.furuta = None
-        sleep(1)
-        del self
+        sleep(0.5)
