@@ -5,22 +5,48 @@ Le script principal à lancer.
 L'environnement tourne dans ce process
 Les codeurs et le moteur tournent dans des process individuels.
 
+Pour la Pi avec routeur
+[osc]
+furuta_address = 192.168.1.2
+furuta_port = 8000
+env_address = 192.168.1.101
+env_port = 8001
+
 """
 
 
 import os
-from time import time_ns, sleep
+from time import time, time_ns, sleep
 from multiprocessing import Process, Pipe
 from threading import Thread
 
 from oscpy.server import OSCThreadServer
 import numpy as np
-from pynput import keyboard
+
+CLAVIER = 1
+try:
+    from pynput import keyboard
+except:
+    print("pynput ne peut pas être appelé.")
+    CLAVIER = 0
+
 
 from rotary_encoder import rotary_encoder_run
 from motor_drive import mein_motor_run
 from my_config import MyConfig
 
+"""
+Echap = Quit
+a right
+z left
+i affichage des infos
+b réglage codeur balancier
+m réglage codeur moteur
+up décalage +
+down décalage -
+t ???????????????????
+
+"""
 
 
 class Clavier:
@@ -34,8 +60,10 @@ class Clavier:
         self.z = 0
         self.i = 0
         self.b = 0
+        self.m = 0
         self.up = 0
         self.down = 0
+        self.t = 0
 
         self.listener = keyboard.Listener(on_press=self.on_press,
                                      on_release=self.on_release)
@@ -49,11 +77,19 @@ class Clavier:
             if self.key == "z":
                 self.z = 1
             if self.key == "i":
-                if self.i == 0: self.i = 1
-                else: self.i = 0
+                if self.i == 0:
+                    self.i = 1
+                else:
+                    self.i = 0
             if self.key == "b":
                 if self.b == 0: self.b = 1
                 else: self.b = 0
+            if self.key == "m":
+                if self.m == 0: self.m = 1
+                else: self.m = 0
+            if self.key == "t":
+                if self.t == 0: self.t = 1
+                else: self.t = 0
 
         except AttributeError:
             if key.name == 'up':
@@ -70,13 +106,19 @@ class Clavier:
 
 
 class Furuta:
+    global CLAVIER
 
     def __init__(self, cf):
-
+        global CLAVIER
         self.cf = cf  # l'objet MyConfig
         self.config = cf.conf
 
-        self.clavier = Clavier()
+        if CLAVIER:
+            self.clavier = Clavier()
+        else:
+            self.clavier = None
+
+        self.time_to_print = time()
         self.cycle = 0
 
         self.codeur_moteur_receive_loop = 1
@@ -107,13 +149,14 @@ class Furuta:
 
         @self.osc.address(b'/observation')
         def callback_observation(*values):
-            # # print(self.alpha, self.alpha_dot, self.teta, self.teta_dot)
+            # Furuta _ai me demande une observation, je la demande à furuta_hard
+            # # self.position_codeurs_request()
+            # A la fin de position_codeurs_request(), je suis à jour, je réponds
             self.osc.answer(b'/obs', [self.alpha,
                                       self.alpha_dot,
                                       self.teta,
                                       self.teta_dot,
                                       values[0]])
-            # # print('envoi de obs',values[0] )
             if self.clavier.i:
                 self.codeurs_settings()
 
@@ -126,25 +169,28 @@ class Furuta:
             self.impulsion_moteur(puissance, lenght, sens)
 
         @self.osc.address(b'/recentering')
-        def callback_impulse(*values):
+        def callback_recentering(*values):
             self.cycle += 1
             self.recentering()
+            self.swing()
 
         @self.osc.address(b'/quit')
-        def callback_impulse(*values):
+        def callback_quit(*values):
             self.quit()
 
     def codeurs_settings(self):
         """keyboard i affiche les infos,
         ensuite:
             - b permet de régler l'offset du codeur balancier
-            - m permet de régler l'offset du codeur moteur mais TODO
+            - TODO m permet de régler l'offset du codeur moteur TODO
         Le réglage se fait avec flèches haut et bas.
         Couper l'alimentation moteur, et faire tourner à la main les codeurs
         pour passer par les points index.
         """
-        a = round(self.alpha, 4)
-        t = round(self.teta, 4)
+        a = round(self.alpha, 3)
+        t = round(self.teta, 3)
+        s = round(np.sin(self.teta), 3)
+        c = round(np.cos(self.teta), 3)
         va = int(self.alpha_dot)
         vt = int(self.teta_dot)
         pa = self.pile_points_moteur[-1][0] - self.pile_points_moteur[0][0]
@@ -152,29 +198,51 @@ class Furuta:
 
         print(f"alpha {a:^8} "
               f"teta {t:^8} "
+              f"sin teta {s:^8} "
+              f"cos teta {c:^8} "
               f"écart des points alpha  {pa:^8} "
               f"écart des points teta {pt:^8}"
               f"vitesse alpha {va:^8} "
               f"vitesse teta {vt:^8} ")
 
-        if self.clavier.b:
-            new = 0
+        if self.clavier:
+            if self.clavier.b:
+                new = 0
 
-            if self.clavier.up:
-                self.offset_bal += 1
-                new = 1
-                self.clavier.up = 0
+                if self.clavier.up:
+                    self.offset_bal += 1
+                    new = 1
+                    self.clavier.up = 0
 
-            if self.clavier.down:
-                self.offset_bal -= 1
-                new = -1
-                self.clavier.down = 0
+                if self.clavier.down:
+                    self.offset_bal -= 1
+                    new = -1
+                    self.clavier.down = 0
 
-            if new == 1 or new == -1:
-                # Sauvegarde dans le fichier *.ini
-                self.cf.save_config('codeur_balancier', 'offset', self.offset_bal)
-                # Envoi à rotary_encoder balancier
-                self.codeur_balanc_conn.send(['offset', self.offset_bal, new])
+                if new == 1 or new == -1:
+                    # Sauvegarde dans le fichier *.ini
+                    self.cf.save_config('codeur_balancier', 'offset', self.offset_bal)
+                    # Envoi à rotary_encoder balancier
+                    self.codeur_balanc_conn.send(['offset', self.offset_bal, new])
+
+            if self.clavier.m:
+                new = 0
+
+                if self.clavier.up:
+                    self.offset_mot += 1
+                    new = 1
+                    self.clavier.up = 0
+
+                if self.clavier.down:
+                    self.offset_mot -= 1
+                    new = -1
+                    self.clavier.down = 0
+
+                if new == 1 or new == -1:
+                    # Sauvegarde dans le fichier *.ini
+                    self.cf.save_config('codeur_moteur', 'offset', self.offset_mot)
+                    # Envoi à rotary_encoder balancier
+                    self.codeur_moteur_conn.send(['offset', self.offset_mot, new])
 
     def codeur_moteur_init(self):
         """Codeur moteur"""
@@ -183,7 +251,7 @@ class Furuta:
         gpioB = int(self.config['codeur_moteur']['gpiob'])
         gpioIndex = int(self.config['codeur_moteur']['index'])
         offset = int(self.config['codeur_moteur']['offset'])
-
+        self.offset_mot = offset
         self.codeur_moteur_conn, self.child_codeur_moteur_conn = Pipe()
 
         self.codeur_moteur = Process(target=rotary_encoder_run,
@@ -232,13 +300,19 @@ class Furuta:
     def pile_codeurs_init(self):
         t = time_ns()
         # Piles: index 0 = le plus ancien, index -1 = le plus récent
+        # # self.pile_points_moteur = [(0, t), (0, t), (0, t), (0, t), (0, t),
+                                   # # (0, t), (0, t), (0, t), (0, t), (0, t),
+                                   # # (0, t), (0, t), (0, t), (0, t), (0, t),
+                                   # # (0, t), (0, t), (0, t), (0, t), (0, t)]
+        # # self.pile_points_balanc = [(0, t), (0, t), (0, t), (0, t), (0, t),
+                                   # # (0, t), (0, t), (0, t), (0, t), (0, t),
+                                   # # (0, t), (0, t), (0, t), (0, t), (0, t),
+                                   # # (0, t), (0, t), (0, t), (0, t), (0, t)]
+
         self.pile_points_moteur = [(0, t), (0, t), (0, t), (0, t), (0, t),
-                                   (0, t), (0, t), (0, t), (0, t), (0, t),
-                                   (0, t), (0, t), (0, t), (0, t), (0, t),
                                    (0, t), (0, t), (0, t), (0, t), (0, t)]
+
         self.pile_points_balanc = [(0, t), (0, t), (0, t), (0, t), (0, t),
-                                   (0, t), (0, t), (0, t), (0, t), (0, t),
-                                   (0, t), (0, t), (0, t), (0, t), (0, t),
                                    (0, t), (0, t), (0, t), (0, t), (0, t)]
 
     def position_codeurs_request_thread(self):
@@ -246,11 +320,15 @@ class Furuta:
         t.start()
 
     def position_codeurs_request(self):
-        """Récupération des valeurs codeurs toutes les 0.002 s = 2 ms"""
-        print("Le thread de demande des positions lancé")
+        """Récupération des valeurs codeurs toutes les 0.004 s = 4 ms"""
+        print("Le thread de demande des positions est lancé")
+
         while self.codeur_moteur_receive_loop and self.codeur_balanc_receive_loop:
+
             self.codeur_moteur_conn.send(['position'])
             self.codeur_balanc_conn.send(['position'])
+            .write()
+
             done = 0
             okm, okb = 0, 0
             # J'attends la réponse
@@ -273,12 +351,27 @@ class Furuta:
                 if okm == 1 and okb == 1:
                     done = 1
 
-                # # print("toto", okm, okb)
                 sleep(0.0001)
 
-            done = 0
             self.alpha, self.alpha_dot, self.teta, self.teta_dot = self.shot()
-            sleep(0.002)
+            sleep(0.001)
+
+            # Pour réglage seulement
+            if self.clavier:
+                # Affichage des infos
+                if self.clavier.i:
+                    if time() - self.time_to_print > 0.5:
+                        self.codeurs_settings()
+                        self.time_to_print = time()
+
+                # Test moteur
+                if self.clavier.a:
+                    self.clavier.a = 0
+                    self.impulsion_moteur(60, 0.05, 'right')
+                if self.clavier.z:
+                    self.clavier.z = 0
+                    self.impulsion_moteur(60, 0.05, 'left')
+
 
     def points_to_alpha(self, points):
         """Conversion des points en radians du chariot
@@ -359,35 +452,43 @@ class Furuta:
         puissance_maxi = int(ratio_puissance_maxi * range_pwm)
 
         # alpha de 0 à 3.14
-        pr = abs(int(puissance_maxi*self.alpha/3.14))
-        l = 0.10
+        alpha_old = self.alpha
 
-        sens = 'right'
-        if self.alpha > 0:
-            sens = 'left'
+        n = 0
+        while self.alpha > 0.5 and n < 5:
+            n += 1
+            pr = abs(int(puissance_maxi*self.alpha*0.4))
+            l = 0.10
+            sens = 'right'
+            if self.alpha > 0:
+                sens = 'left'
+            self.impulsion_moteur(pr, l, sens)
+            # Attente de la fin du recentrage
+            sleep(1)
+            print(f"{self.cycle} Recentrage de {pr} sens {sens} "
+                  f"alpha avant: {round(alpha_old, 2)} "
+                  f"alpha après {round(self.alpha, 2)}")
 
-        self.impulsion_moteur(pr, l, sens)
-        # Attente de la fin du recentrage
-        sleep(0.5)
-
+    def swing(self):
         # Swing
+        ratio_puissance_maxi = float(self.config['furuta']['ratio_puissance_maxi'])
+        range_pwm = int(self.config['moteur']['range_pwm'])
+        puissance_maxi = int(ratio_puissance_maxi * range_pwm)
+
         sens = 'right'
         anti_sens = 'left'
         if self.alpha > 0:
             sens = 'left'
             anti_sens = 'right'
 
-        ps = puissance_maxi * 0.6
+        ps = puissance_maxi * 0.4
         self.impulsion_moteur(ps, 0.08, sens)
         sleep(0.35)
         self.impulsion_moteur(ps, 0.1, anti_sens)
         sleep(0.05)
-        print(f"{self.cycle} Recentrage de {pr} sens {sens} "
-              f"alpha: {round(self.alpha, 2)} "
-              f"Swing {ps}")
+        print(f"{self.cycle} Swing {ps}")
 
-        self.osc.send_message(b'/recentering_done', [1], self.env_address,
-                                                   self.env_port)
+        self.osc.send_message(b'/recentering_done', [1], self.env_address, self.env_port)
 
     def quit(self):
         print("Quit dans Furuta")
@@ -416,46 +517,3 @@ def main():
 if __name__ == '__main__':
 
     main()
-
-
-        # # while not self.stop:
-            # # if self.a:
-                # # key.a = 0
-                # # mf.impulsion_moteur(60, 0.10, 'left')
-                # # print("impulsion à gauche")
-            # # elif self.z:
-                # # key.z = 0
-                # # mf.impulsion_moteur(60, 0.10, 'right')
-                # # print("impulsion à droite")
-
-
-            # # if key.a:
-                # # key.a = 0
-                # # mf.recentering()
-                # # print("recentering")
-
-    # # def codeur_moteur_receive_thread(self):
-        # # t = Thread(target=self.codeur_moteur_receive)
-        # # t.start()
-
-    # # def codeur_moteur_receive(self):
-        # # while self.codeur_moteur_receive_loop:
-            # # data = self.codeur_moteur_conn.recv()
-            # # if data[0] == 'codeur_position':
-                # # points_moteur = (data[1], time_ns())
-                # # self.pile_points_moteur.append(points_moteur)
-                # # del self.pile_points_moteur[0]
-            # # sleep(0.0005)
-
-    # # def codeur_balanc_receive_thread(self):
-        # # t = Thread(target=self.codeur_balanc_receive)
-        # # t.start()
-
-    # # def codeur_balanc_receive(self):
-        # # while self.codeur_balanc_receive_loop:
-            # # data = self.codeur_balanc_conn.recv()
-            # # if data[0] == 'codeur_position':
-                # # points_balanc = (data[1], time_ns())
-                # # self.pile_points_balanc.append(points_balanc)
-                # # del self.pile_points_balanc[0]
-            # # sleep(0.0005)

@@ -3,6 +3,7 @@
 
 à 13 hz, 1 heure = 3600*13 = 46800
 
+modif vitesse à 2510848
 
 model 15
 learning_rate = 0.0008
@@ -257,11 +258,11 @@ class TrainTest:
         TIMESTEPS = self.learning_steps
         batch = int(self.config[self.numero]['batch'])
 
-        # Temps en secondes du train complet
-        t = batch * TIMESTEPS / 13
+        # Temps en secondes du train complet. x Hz
+        t = batch * TIMESTEPS / 33.3
         f = datetime.now() + timedelta(seconds=t)
         fin = f.strftime("%d-%m-%Y | %H:%M")
-        print(f"Fin à {fin}")
+        print(f"\nFin à {fin}\n")
 
         # # eval_callback = EvalCallback(self.env,
                                      # # best_model_save_path=self.best_model_save_path,
@@ -274,13 +275,13 @@ class TrainTest:
 
             dt_now = datetime.now()
             dt = dt_now.strftime("%d-%m-%Y | %H:%M")
-            print(f"\nApprentissage n° {i} sur {batch} Steps total = {self.env.step_total} "
+            print(f"\nApprentissage n° {i+1} sur {batch} Steps total = {self.env.step_total} "
                  f"Learning steps = {self.learning_steps} Steps par cycle = "
                  f"{self.env.step_maxi} à {dt}\n")
 
             self.model.learn(total_timesteps=TIMESTEPS,
                              reset_num_timesteps=False,
-                             tb_log_name=f"PPO{self.numero}")  # ,
+                             tb_log_name=f"PPO{self.numero}")  #,
                              # # callback=eval_callback)
 
             self.model.save(f"{self.models_dir}/{TIMESTEPS*i}")

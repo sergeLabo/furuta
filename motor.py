@@ -12,7 +12,6 @@ from time import sleep
 
 
 
-
 class MyMotor:
 
     def __init__(self, pi, PWM, left, right, freq_pwm, range_pwm):

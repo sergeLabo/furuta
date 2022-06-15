@@ -27,7 +27,7 @@ from my_config import MyConfig
 class RotaryEncoder:
     """Class to decode mechanical rotary encoder pulses."""
 
-    def __init__(self, conn, name, gpioA, gpioB, index, offset, verbose=0):
+    def __init__(self, conn, name, gpioA, gpioB, index, offset):
         """name = str pour reconnaitre le name
         gpioA pin du canal A
         gpioB pin du canal B
@@ -40,8 +40,9 @@ class RotaryEncoder:
         self.gpioA = gpioA
         self.gpioB = gpioB
         self.index = index
+        self.index_last_time = time()
         self.offset = offset
-        self.verbose = verbose
+        self.sens = 0
 
         self.levA = 0
         self.levB = 0
@@ -54,10 +55,10 @@ class RotaryEncoder:
         self.set_gpio_mode(gpioB, pigpio.INPUT)
         self.set_gpio_mode(index, pigpio.INPUT)
 
-        # Callbacks, permet de les cancel
-        self.cbA = self.my_callback(self.gpioA)
-        self.cbB = self.my_callback(self.gpioB)
-        self.cbi = self.pi.callback(self.index, pigpio.EITHER_EDGE, self.new_index)
+        # Callbacks                 numero pin, front montant ou descendant, appel method
+        self.cbA = self.pi.callback(self.gpioA, pigpio.EITHER_EDGE, self.pulsation)
+        self.cbB = self.pi.callback(self.gpioB, pigpio.EITHER_EDGE, self.pulsation)
+        self.cbi = self.pi.callback(self.index, pigpio.RISING_EDGE, self.pulsation)
 
         # Thread de comm avec main
         self.encoder_conn_loop = 1
@@ -67,26 +68,26 @@ class RotaryEncoder:
     def pulsation(self, gpio, level, tick):
         """Decode the rotary encoder pulse.
 
-                   +---------+         +---------+      0
+                   +---------+         +---------+      1
                    |         |         |         |
          A         |         |         |         |
                    |         |         |         |
-         +---------+         +---------+         +----- 1
+         +---------+         +---------+         +----- 0
 
-             +---------+         +---------+            0
+             +---------+         +---------+            1
              |         |         |         |
          B   |         |         |         |
              |         |         |         |
-         ----+         +---------+         +---------+  1
+         ----+         +---------+         +---------+  0
         """
-        # # print(gpio, level, tick)
+
         # Qui a changé d'état
         if gpio == self.gpioA:
             self.levA = level
         else:
             self.levB = level
 
-        # Qui avai changé au top précédent, permet de bloquer après une prise en
+        # Qui avait changé au top précédent, permet de bloquer après une prise en
         # compte d'un changement d'état
         if gpio != self.lastGpio_A_B:
             self.lastGpio_A_B = gpio
@@ -95,10 +96,21 @@ class RotaryEncoder:
         if gpio == self.gpioA and level == 1:
             if self.levB == 1:
                 self.position += 1
+                self.sens = 1
+
         # Sens négatif et front montant
         elif gpio == self.gpioB and level == 1:
             if self.levA == 1:
                 self.position -= 1
+                self.sens = -1
+
+        # RAZ sur index
+        if gpio == self.index:
+            # Que d'un coté
+            if self.sens == 1:
+                if self.position != self.offset:
+                    # # print(f"RAZ position avant: {self.position:^8} offset: {self.offset:^8}")
+                    self.position = self.offset
 
     def set_gpio_mode(self, gpio, mode):
         """gpio: de 0 à 53
@@ -106,28 +118,10 @@ class RotaryEncoder:
         """
         self.pi.set_mode(gpio, mode)
 
-    def my_callback(self, user_gpio):
-        """Appelle pulsation() si changement d'état de A ou B"""
-
-        return self.pi.callback(user_gpio, pigpio.EITHER_EDGE, self.pulsation)
-
-    def new_index(self, gpio, level, tick):
-        """Y a t-il un index à droite et un index à gauche ?"""
-
-        if gpio == self.index:
-            # Changemnt d'état de index
-            if level != self.last_index:
-                self.last_index = level
-                if self.verbose:
-                    print("Remise à zéro de self.position:", self.name, self.position)
-                # Remise à zéro du compteur
-                self.position = self.offset
-
     def cancel(self):
         sleep(0.1)
         self.cbA.cancel()
         self.cbB.cancel()
-        self.cbi.cancel()
         self.pi.stop()
         print("Rotary encoder Fin de", self.name)
 
@@ -140,6 +134,11 @@ class RotaryEncoder:
         t.start()
 
     def encoder_receive(self):
+        """ Dérive: [957, 94, 999, 4, 991]
+            Dérive: [3985, 2, 3996, 5, 21]
+            [3998, 7, 3999, 23, 4, 3997, 22, 3984, 1145, 10, 3997, 7, 3867, 3229, 3832, 2936, 3226, 3931, 5, 2, 471, 8]
+            [0, 20, 0, 7, 94, 81, 19, 4, 16, 1, 38, 0, 984, 911, 54, 995, 998, 7, 13, 8, 15, 0]
+        """
         while self.encoder_conn_loop:
             data = self.conn.recv()
 
@@ -157,19 +156,16 @@ class RotaryEncoder:
                     # Furuta() donne un nouvel offset
                     self.offset = data[1]
                     self.position += data[2]
-                    print(self.position)
 
-            # Furuta() attend la réponse, ce délai n'est pas important
+            # Furuta() attend la réponse
             sleep(0.0005)
 
         print("Fin du thread de l'encoder", self.name)
-        sleep(0.1)
         os._exit(0)
 
 
 
 def codeur_moteur_test():
-    """point zéro vers le centre"""
 
     cf = MyConfig('./furuta_hard.ini')
     config = cf.conf
@@ -179,12 +175,11 @@ def codeur_moteur_test():
     gpioIndex = int(config['codeur_moteur']['index'])
     offset = int(config['codeur_moteur']['offset'])
 
-    moteur = RotaryEncoder(None, "moteur", gpioA, gpioB, gpioIndex, offset, verbose=1)
-
-    while time() - 60 > 0:
-        alpha = moteur.position*180/500
-        print("alpha", alpha)
-        sleep(0.01)
+    moteur = RotaryEncoder(None, "moteur", gpioA, gpioB, gpioIndex, offset)
+    t = time()
+    while time() - t < 600:
+        print("position", moteur.position)
+        sleep(0.1)
 
     moteur.cancel()
 
@@ -199,12 +194,11 @@ def codeur_balancier_test():
     gpioIndex = int(config['codeur_balancier']['index'])
     offset = int(config['codeur_balancier']['offset'])
 
-    balancier = RotaryEncoder(None, "balancier", gpioA, gpioB, gpioIndex, offset, verbose=1)
-
-    while time() - 60 > 0:
-        teta = balancier.position*180/2000
-        print("teta", teta)
-        sleep(0.01)
+    balancier = RotaryEncoder(None, "balancier", gpioA, gpioB, gpioIndex, offset)
+    t = time()
+    while time() - t < 60:
+        print("position", balancier.position)
+        sleep(0.1)
 
     balancier.cancel()
 
@@ -212,10 +206,10 @@ def codeur_balancier_test():
 def rotary_encoder_run(conn, name, gpioA, gpioB, index, offset):
     """Pour lancer depuis main.py en multiprocess"""
 
-    enc = RotaryEncoder(conn, name, gpioA, gpioB, index, offset, verbose=0)
+    enc = RotaryEncoder(conn, name, gpioA, gpioB, index, offset)
 
 
 
 if __name__ == "__main__":
-    codeur_moteur_test()
-    # # codeur_balancier_test()
+    # # codeur_moteur_test()
+    codeur_balancier_test()

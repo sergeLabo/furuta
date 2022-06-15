@@ -120,9 +120,9 @@ class MeinMotor:
                     self.set_pin_low(self.left)
                     self.set_pin_low(self.right)
 
-            sleep(0.0005)
+            sleep(0.001)
         print("Fin du thread du moteur")
-        (sleep)(0.1)
+        sleep(0.1)
         os._exit(0)
 
 

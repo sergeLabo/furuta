@@ -1,10 +1,16 @@
 
 """
 L'environnement du Furuta pour gym et stable-baselines3
+
+Pour le MSI et routeur
+furuta_address = 192.168.1.2
+furuta_port = 8000
+env_address = 192.168.1.101
+env_port = 8001
+
 """
 
 import os, sys
-# # from os.path import exists
 from time import time, sleep, time_ns
 from threading import Thread
 from datetime import datetime
@@ -28,7 +34,7 @@ class Clavier:
     def __init__(self):
 
         self.quit = 0
-        self.i = 0
+        self.j = 0
 
         self.listener = keyboard.Listener(on_press=self.on_press,
                                           on_release=self.on_release)
@@ -38,9 +44,9 @@ class Clavier:
         try:
             # # print(f'alphanumeric key {key.char} pressed')
             self.key = key.char
-            if self.key == "i":
-                if self.i == 0: self.i = 1
-                else: self.i = 0
+            if self.key == "j":
+                if self.j == 0: self.j = 1
+                else: self.j = 0
 
         except AttributeError:
             self.special = key.name
@@ -177,7 +183,7 @@ class FurutaEnv(gym.Env):
             self.teta = values[2]
             self.teta_dot = values[3]
             self.observation_done = 1
-            self.synchro = f" step {self.current_step:^6} step reçu {values[4]:^6}"
+            self.synchro = f" envoyé {self.current_step:^6} reçu {values[4]:^6}"
 
         @self.osc.address(b'/recentering_done')
         def callback_recentering_done(*values):
@@ -304,10 +310,7 @@ class FurutaEnv(gym.Env):
         # Attente de la réponse
         # # n = 0
         while not self.observation_done:
-            # # if self.clavier.i:
-                # # print(n)
-                # # n += 1
-            sleep(0.001)
+            sleep(0.0001)
         # Remise à zéro tout de suite
         self.observation_done = 0
 
@@ -327,21 +330,27 @@ class FurutaEnv(gym.Env):
         rewards = self.get_reward()
         self.cycle_reward += rewards
 
-        if self.clavier.i:
+        if self.clavier.j:
             tttt = int((time_ns() - self.t_step)/1000000)
             self.t_step = time_ns()
-            a = round(self.alpha, 4)
-            t = round(self.teta, 4)
+            a = round(self.alpha, 3)
+            t = round(self.teta, 3)
+            s = round(np.sin(self.teta), 3)
+            c = round(np.cos(self.teta), 3)
             va = int(self.alpha_dot)
             vt = int(self.teta_dot)
             ssss = sens.decode('utf-8')
             if ssss == 'left': ssss = 'left '
 
-            print(f"{self.current_step:^7} puissance: {puissance:^6} "
-                  f"sens: {ssss} Durée du step: {tttt:^4}  "
-                  f"alpha {a:^7} teta {t:^7} vitesse alpha {va:^9} vitesse teta {vt:^9} "
-                  f"action: {action:^9} rewards {round(rewards, 3):^6} "
-                  f"{self.current_step:^6} {self.synchro}")
+            print(f"Num {self.current_step:^7} "
+                  f"action {action:^4}  puissance {puissance:^6} "
+                  f"sens {ssss} "
+                  f"alpha {a:^7} teta {t:^7} "
+                  f"sin teta {s:^7} cos teta {c:^7} "
+                  f"vitesse alpha {va:^9} vitesse teta {vt:^9} "
+                  f"rewards {round(rewards, 3):^6} "
+                  f"Step {self.current_step:^6} {self.synchro} "
+                  f"Durée {tttt:^4}")
 
         # Observation de l'état: alpha = chariot, teta = balancier
         obs = np.array([np.float(self.alpha),

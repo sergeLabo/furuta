@@ -1,0 +1,29 @@
+
+<MainScreen>:
+    # # BoxLayout:
+        # # Button:
+            # # text: 'Goto settings'
+            # # on_press: root.manager.current = 'settings'
+        # # Button:
+            # # text: 'Quit'
+    GridLayout:
+        spacing: 10
+        padding: 10
+        cols: 2
+        rows: 2
+        Button:
+            text: "bouton 1"
+        Button:
+            text: "bouton 2"
+        Button:
+            text: "bouton 3"
+        Button:
+            text: "bouton 4"
+
+<LogsScreen>:
+    BoxLayout:
+        Button:
+            text: 'My settings button'
+        Button:
+            text: 'Back to menu'
+            on_press: root.manager.current = 'menu'
