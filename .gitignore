@@ -4,15 +4,9 @@ old/
 *.project
 *.geanywb
 mon_env/
-
-bests/
 datas/
 logs/
 models/
-my_models/
-weights/
-
-
 
 
 # Byte-compiled / optimized / DLL files

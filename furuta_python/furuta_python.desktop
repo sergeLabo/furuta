@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=
+Name=Training
+Comment=Apprentissage
+Exec=sh /home/serge/projets/furuta_python/run_furuta_python.sh
+Icon=/usr/share/icons/gnome/48x48/actions/gtk-execute.png
+Terminal=true
+Type=Application
+Categories=
+X-KeepTerminal=true
