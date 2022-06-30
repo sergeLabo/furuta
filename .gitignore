@@ -7,6 +7,7 @@ mon_env/
 datas/
 logs/
 models/
+exclude/
 
 
 # Byte-compiled / optimized / DLL files
