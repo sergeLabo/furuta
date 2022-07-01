@@ -118,23 +118,7 @@ class FurutaEnv(gym.Env):
         if self.furuta:  # pour ne pas demander d'impulsion si quit !
             self.furuta.impulsion_moteur(puissance, self.lenght, sens)
 
-        a0, t0 = self.furuta.shot()
-        # duration_of_motor_impulse = 0.02
-        # tempo_step = 0.03
-        sleep(self.tempo)
-        a1, t1 = self.furuta.shot()
-
-        self.alpha = a1
-        if a1 - a0 != 0:
-            self.alpha_dot = 0.01 / (a1 - a0)
-        else:
-            self.alpha_dot = 0
-        self.teta = t1
-        if t1 - t0 != 0:
-            self.teta_dot = 0.01 / (t1 - t0)
-        else:
-            self.teta_dot = 0
-        # # print(self.alpha, self.alpha_dot, self.teta, self.teta_dot)
+        self.alpha, self.alpha_dot, self.teta, self.teta_dot = self.get_pos_speed()
 
         # Si done est True, arrêt du cycle
         done = False
@@ -168,6 +152,33 @@ class FurutaEnv(gym.Env):
 
         return obs, rewards, done, {}
 
+    def get_pos_speed(self):
+        """L'impulsion moteur dure duration_of_motor_impulse = 0.02 ou 0.03
+        La 2ème observation doit être faite après la fin de l'impulsion.
+        self.tempo est le temps entre la fin de l'impulsion moteur et
+        la 2ème observation, tempo_step dans *.ini
+        """
+        # Attente pendant l'impulsion moteur
+        sleep(self.lenght)  # 0.02
+        # Shot
+        a0, t0 = self.furuta.shot()
+
+        sleep(self.tempo)  # 0.01
+        a1, t1 = self.furuta.shot()
+
+        alpha = a1
+        if a1 - a0 != 0:
+            alpha_dot = 0.01 / (a1 - a0)
+        else:
+            alpha_dot = 0
+        teta = t1
+        if t1 - t0 != 0:
+            teta_dot = 0.01 / (t1 - t0)
+        else:
+            teta_dot = 0
+
+        return alpha, alpha_dot, teta, teta_dot
+
     def get_spaces(self):
         """Définition des espaces:
 
@@ -198,29 +209,13 @@ class FurutaEnv(gym.Env):
     def reset(self):
         """Reset à la fin d'un cycle:
             - Donne des infos sur le cycle terminé,
-            - Crée des positions et vitesses aléatoires,
             - Retourne l'observation à la fin  du reset.
         """
-        sleep(1)
         # Attente pour éviter les retards
-        # # sleep(10)
-        #self.furuta.recentering()
-        # Attente pour que le chariot ait le temps de se recenter
-        # # sleep(0.1)
-        a0, t0 = self.furuta.shot()
-        sleep(self.tempo)
-        a1, t1 = self.furuta.shot()
+        sleep(5)
 
-        self.alpha = a1
-        if a1 - a0 != 0:
-            self.alpha_dot = 0.01 / (a1 - a0)
-        else:
-            self.alpha_dot = 0
-        self.teta = t1
-        if t1 - t0 != 0:
-            self.teta_dot = 0.01 / (t1 - t0)
-        else:
-            self.teta_dot = 0
+        # Observation
+        self.alpha, self.alpha_dot, self.teta, self.teta_dot = self.get_pos_speed()
 
         # Observation de l'état de départ
         obs = np.array([np.float(self.alpha),
