@@ -1,7 +1,14 @@
 
+"""
+Le lien avec le matériel:
+- codeurs
+- moteur
+"""
+
 from time import time, sleep
 from threading import Thread
 from pathlib import Path
+
 from multiprocessing import Process, Pipe
 from multiprocessing.sharedctypes import Value
 
@@ -41,6 +48,7 @@ class Furuta:
         self.init_codeur_balancier()
 
     def init_motor(self):
+        # TODO doc
         PWM = int(self.config['moteur']['pwm'])
         left = int(self.config['moteur']['left'])
         right = int(self.config['moteur']['right'])
@@ -54,6 +62,7 @@ class Furuta:
 
     def init_codeur_moteur(self):
         """Objet du codeur Moteur"""
+        # TODO doc
         gpioA_m = int(self.config['codeur_moteur']['gpioa'])
         gpioB_m = int(self.config['codeur_moteur']['gpiob'])
         index_m = int(self.config['codeur_moteur']['index'])
@@ -73,27 +82,30 @@ class Furuta:
 
     def init_codeur_balancier(self):
         """Objet du codeur balancier"""
+        # TODO doc
         gpioA_b = int(self.config['codeur_balancier']['gpioa'])
         gpioB_b = int(self.config['codeur_balancier']['gpiob'])
         index_b = int(self.config['codeur_balancier']['index'])
         offset_b = int(self.config['codeur_balancier']['offset'])
         self.shared_value_balanc = Value("i", -4000)
+        # Le Pipe est nécessaire pour avoir une shared_value
         self.codeur_balancier_conn, child_conn2 = Pipe()
         self.codeur_balancier = Process(target=rotary_encoder_run,
                                         args=(child_conn2,
                                               self.shared_value_balanc,
                                               'balancier',
-                                               gpioA_b,
-                                               gpioB_b,
-                                               index_b,
-                                               offset_b, ))
+                                              gpioA_b,
+                                              gpioB_b,
+                                              index_b,
+                                              offset_b, ))
         self.codeur_balancier.start()
         print(f"Codeur balancier lancé.")
 
     def shot(self):
-        """Appelé par train_test.py pour obtenir une observation.
+        """Appelé par furuta_env.py pour obtenir une observation.
         Retourne alpha, teta
         """
+        # TODO doc
         points_alpha = self.shared_value_moteur.value
         a = self.points_to_alpha(points_alpha)
 
@@ -106,13 +118,16 @@ class Furuta:
         """Conversion des points en radians du chariot
         1000 points pour 2PI rd
         """
+        # TODO mettre la résolution dans *.ini
         a = (np.pi * points) / 500
         return a
 
     def points_to_teta(self, points):
         """Conversion des points en radians du balancier
-        4000 points pour 2PI rd
+        1000 points pour 2PI rd
+        Il y a 2 méthodes car les codeurs n'ont pas forcément la même résolution
         """
+        # TODO mettre la résolution dans *.ini
         t = (np.pi * points) / 500
         return t
 
@@ -122,7 +137,9 @@ class Furuta:
         duration = durée de l'impulsion moteur
         sens = left ou right
         """
-        # Sécurité pour ne pas emballer le moteur
+        # Sécurité pour ne pas emballer le moteur peut être en action,
+        # et que les scripts plante: et il s'emballe !!!!
+        # TODO un script pour reseter si ?????
         puissance_maxi = self.ratio_puissance_maxi * self.range_pwm
         if puissance > puissance_maxi:
             puissance = puissance_maxi
@@ -132,11 +149,13 @@ class Furuta:
         self.do_impulsion(puissance, duration, sens)
 
     def do_impulsion(self, puissance, duration, sens):
+        # TODO doc
         t = Thread(target=self.do_impulsion_thread,
                      args=(puissance, duration, sens,))
         t.start()
 
     def do_impulsion_thread(self, puissance, duration, sens):
+        # TODO doc
         self.motor.motor_run(puissance, sens)
         # Stop du moteur dans duration seconde
         sleep(duration)
@@ -161,13 +180,11 @@ class Furuta:
 
     def clavier_thread(self):
         """Capture des événement clavier toutes les 0.2 s"""
-
         c = Thread(target=self.clavier_loop, )
         c.start()
 
     def clavier_loop(self):
         """Boucle de Capture des événement clavier toutes les 0.2 s"""
-
         while self.clavier_active:
             if self.clavier.a == 1:
                 self.impulsion_moteur(50, 0.05, 'right')
@@ -180,14 +197,16 @@ class Furuta:
     def quit(self):
         """Quitter proprement avec Echap,
         sinon les instances pigpio ne sont pas arrêtées, or elles sont limitées
-        à 32
+        à 32 !
         """
         self.motor.cancel()
         # Attente pour que le moteur stoppe
         sleep(0.2)
+
         self.codeur_moteur_conn.send(['quit', 1])
         self.codeur_balancier_conn.send(['quit', 1])
         sleep(0.2)
+
         self.codeur_moteur.terminate()
         self.codeur_balancier.terminate()
         # Fin du thread clavier
@@ -200,6 +219,12 @@ class Furuta:
 
 if __name__ == '__main__':
 
+    """Pour vérifier tout le matériel.
+    Affiche
+    """
+    # Nombre de secondes avant de quitter
+    n = 10
+
     from clavier import Clavier
 
     current_dir = str(Path(__file__).parent.absolute())
@@ -209,17 +234,17 @@ if __name__ == '__main__':
     print("Fichier de configuration:", ini_file)
 
     cf = MyConfig(ini_file)
-    numero = "100"
+    numero = "102"
     clavier = Clavier()
     furuta = Furuta(cf, numero, clavier)
     i = 0
-    while i < 1:
+    while i < n:
         i += 1
-        # # furuta.shot()
-        furuta.motor.motor_run(35, 'left')
-        sleep(10)
-        furuta.motor.stop()
+        a, t = furuta.shot()
+        print(f"alpha={round(a, 3)} teta={round(t, 3)}")
+        sleep(1)
 
         if clavier.quit:
             furuta.quit()
+
     furuta.quit()

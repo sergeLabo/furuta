@@ -16,30 +16,33 @@ Encoder du balancier:
 
 import os
 from time import time, sleep
-from threading import Thread
+from pathlib import Path
+# Voir
+# https://stackoverflow.com/questions/16981921/relative-imports-in-python-3
+# # print('Running' if __name__ == '__main__' else 'Importing', Path(__file__).resolve())
 
 import numpy as np
 import pigpio
 
 from my_config import MyConfig
 
-# TODO ajouter la doc pour réglage offset
-# TODO améliorer le RAZ si Index à droite ou à gauche
+
 
 class RotaryEncoder:
     """Class to decode mechanical rotary encoder pulses."""
 
-    def __init__(self, conn, shared_value, name, gpioA, gpioB, index, offset):
+    def __init__(self, shared_value, name, gpioA, gpioB, index, offset):
         """Il faut créer une nouvelle instance de pigpio.pi()
-        conn = connection avec le Pipe
-        name = str pour reconnaitre le name
-        gpioA pin du canal A
-        gpioB pin du canal B
-        index pin du top par tour
-        """
 
+        pi: instance pigpio
+        shared_value: entier en mémoire partagé
+        name: str pour reconnaitre le name
+        gpioA: pin du canal A
+        gpioB: pin du canal B
+        index: pin du top par tour
+        """
+        print(f"Lancement du codeur {name}")
         self.pi = pigpio.pi()
-        self.conn = conn
         self.shared_value = shared_value
         self.name = name
         self.gpioA = gpioA
@@ -64,11 +67,6 @@ class RotaryEncoder:
         self.cbB = self.pi.callback(self.gpioB, pigpio.EITHER_EDGE, self.pulsation)
         self.cbi = self.pi.callback(self.index, pigpio.RISING_EDGE, self.pulsation)
 
-        # Thread de comm avec furuta
-        self.encoder_conn_loop = 1
-        if conn:
-            self.encoder_receive_thread()
-
     def pulsation(self, gpio, level, tick):
         """Decode the rotary encoder pulse.
 
@@ -88,6 +86,7 @@ class RotaryEncoder:
                  +1                    +1
         8 changement d'état = 2 points comptés
         """
+        print("pulsation")
         # Qui a changé d'état
         if gpio == self.gpioA:
             self.levA = level
@@ -113,13 +112,15 @@ class RotaryEncoder:
 
         # RAZ sur index
         if gpio == self.index:
-            # # # Que d'un coté
-            # # if self.sens == -1:
             if self.position != self.offset:
+                d = self.position - self.offset
                 self.position = self.offset
 
         if self.shared_value is not None:
             self.shared_value.value = self.position
+            print(self.position)
+        else:
+            print("bad")
 
     def set_gpio_mode(self, gpio, mode):
         """gpio: de 0 à 53
@@ -127,25 +128,8 @@ class RotaryEncoder:
         """
         self.pi.set_mode(gpio, mode)
 
-    def encoder_receive_thread(self):
-        print(f"Lancement du thread receive dans rotary_encoder du {self.name}")
-        t = Thread(target=self.encoder_receive)
-        t.start()
-
-    def encoder_receive(self):
-        while self.encoder_conn_loop:
-            data = self.conn.recv()
-
-            if data:
-                if data[0] == 'quit':
-                    print("quit reçu dans rotary_encoder", self.name)
-                    self.encoder_conn_loop = 0
-                    self.cancel()
-            sleep(1)
-
-        print("Fin du thread de l'encoder", self.name)
-
     def cancel(self):
+        sleep(0.1)
         self.cbA.cancel()
         self.cbB.cancel()
         self.pi.stop()
@@ -153,16 +137,21 @@ class RotaryEncoder:
 
 
 
-def rotary_encoder_run(conn, shared_value, name, gpioA, gpioB, index, offset):
-    """Pour lancer depuis furuta.py en multiprocess"""
-
+def rotary_encoder_run(shared_value, name, gpioA, gpioB, index, offset):
+    """Pour lancer depuis main.py en multiprocess"""
     print(f"Création d'un objet RotaryEncoder pour {name}")
-    enc = RotaryEncoder(conn, shared_value, name, gpioA, gpioB, index, offset)
+    enc = RotaryEncoder(shared_value, name, gpioA, gpioB, index, offset)
 
 
 def codeur_test(lequel):
 
-    cf = MyConfig('./furuta.ini')
+    current_dir = str(Path(__file__).parent.absolute())
+    print("Dossier courrant:", current_dir)
+
+    ini_file = current_dir + '/furuta.ini'
+    print("Fichier de configuration:", ini_file)
+
+    cf = MyConfig(ini_file)
     config = cf.conf
 
     lequel = 'codeur_' + lequel
@@ -172,9 +161,11 @@ def codeur_test(lequel):
     gpioIndex = int(config[lequel]['index'])
     offset = int(config[lequel]['offset'])
 
-    moteur = RotaryEncoder(None, None, "moteur", gpioA, gpioB, gpioIndex, offset)
+    pi = pigpio.pi()
+    #                      shared_value, name, gpioA, gpioB, index, offset
+    moteur = RotaryEncoder(None, "moteur", gpioA, gpioB, gpioIndex, offset)
     t = time()
-    while time() - t < 40:
+    while time() - t < 20:
         print("position", moteur.position)
         sleep(0.1)
 
@@ -182,5 +173,5 @@ def codeur_test(lequel):
 
 
 if __name__ == "__main__":
-    # # codeur_test("moteur")
-    codeur_test("balancier")
+    codeur_test("moteur")
+    # # codeur_test("balancier")

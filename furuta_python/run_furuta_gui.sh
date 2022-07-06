@@ -8,4 +8,4 @@ echo $full_path
 dir_path=$(dirname $full_path)
 echo $dir_path
 
-'python3' $dir_path'/train_test.py'
+'python3' $dir_path'/furuta_gui.py'

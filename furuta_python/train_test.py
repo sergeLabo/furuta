@@ -1,32 +1,78 @@
 
+"""
+Pilotage des apprentissages et tests
+"""
+
 from time import sleep
 from datetime import datetime, timedelta
-from pathlib import Path
 import json
 import os, sys
 from os.path import exists
+from threading import Thread
+
+from pathlib import Path
 
 import gym
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import BaseCallback
 
 from my_config import MyConfig
 from furuta_env import FurutaEnv
 
 
 
+class CustomCallback(BaseCallback):
+    """ A custom callback that derives from ``BaseCallback``.
+    :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
+    """
+    def __init__(self, verbose=0):
+        """Those variables will be accessible in the callback
+        (they are defined in the base class).
+        The RL model
+            self.model = None  # type: BaseAlgorithm
+        An alias for self.model.get_env(), the environment used for training
+            self.training_env = None  # type: Union[gym.Env, VecEnv, None]
+        Number of time the callback was called
+            self.n_calls = 0  # type: int
+            self.num_timesteps = 0  # type: int
+        local and global variables
+            self.locals = None  # type: Dict[str, Any]
+            self.globals = None  # type: Dict[str, Any]
+        The logger object, used to report things in the terminal
+            self.logger = None  # stable_baselines3.common.logger
+        Sometimes, for event callback, it is useful to have access to the parent object
+            self.parent = None  # type: Optional[BaseCallback]
+        """
+        super().__init__()
+
+    def _on_step(self):
+        """This method will be called by the model after each call to `env.step()`.
+        For child callback (of an `EventCallback`), this will be called
+        when the event is triggered.
+        :return: (bool) If the callback returns False, training is aborted early.
+        """
+        _continue = True
+        if not self.model.env.envs[0].env.continue_env:
+            print("Fin du training.")
+            _continue = False
+        return _continue
+
+
 class TrainTest:
 
-    def __init__(self, current_dir, config_obj, numero):
+    def __init__(self, current_dir, config_obj, numero, conn):
 
         self.current_dir = current_dir
-
         # Mon object Config
         self.config_obj = config_obj
         # Le dict de la configuration
         self.config = config_obj.conf
-
         self.numero = numero  # str
+        # Pipe
+        self.conn = conn
+        self.testing_conn_loop = 1
+        self.testing_loop = 1
+
         self.learning_steps = int(self.config[self.numero]['learning_steps'])
         self.learning_rate = float(self.config[self.numero]['learning_rate'])
         self.n_steps = int(self.config[self.numero]['n_steps'])
@@ -38,11 +84,10 @@ class TrainTest:
         self.ent_coef = float(self.config[self.numero]['ent_coef'])
         self.vf_coef = float(self.config[self.numero]['vf_coef'])
         self.max_grad_norm = float(self.config[self.numero]['max_grad_norm'])
-        self.best =int(self.config[self.numero]['use_best_model'])
 
         self.model_name = f"ppo_neo_{self.numero}"
         print(f"Nom du model {self.model_name}")
-        self.env = FurutaEnv(self.current_dir, self.config_obj, self.numero)
+        self.env = FurutaEnv(self.current_dir, self.config_obj, self.numero, self.conn)
         self.model = None
 
         self.model_file = f'{self.current_dir}/my_models/{self.model_name}.zip'
@@ -51,7 +96,6 @@ class TrainTest:
         self.models_dir = f"{self.current_dir}/models/PPO{self.numero}"
         self.logdir = f"{self.current_dir}/logs"
         self.datas_dir = f"{self.current_dir}/datas/datas_{self.numero}"
-        self.best_model_save_path = f"{self.current_dir}/bests/best_{self.numero}"
 
         if not os.path.exists(self.models_dir):
             os.makedirs(self.models_dir)
@@ -62,9 +106,6 @@ class TrainTest:
         if not os.path.exists(self.datas_dir):
             os.makedirs(self.datas_dir)
             print(f"Création de {self.datas_dir}")
-        if not os.path.exists(self.best_model_save_path):
-            os.makedirs(self.best_model_save_path)
-            print(f"Création de {self.best_model_save_path}")
 
     def create_model(self):
         """https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
@@ -231,7 +272,7 @@ class TrainTest:
 
     def load_model(self):
         self.model = PPO.load(self.model_file, cloudpickle=False, verbose=0)
-        print(f"\nModel chargé: {self.model_name} \n")
+        print(f"\nModel chargé: {self.model_name} soit {self.model_file}\n")
 
     def save_efficiency(self):
         """Enregistrement de * step_total, cycle_reward"""
@@ -246,68 +287,21 @@ class TrainTest:
                 f.write(d)
             self.env.datas = []
 
-    def doc_StopTrainingOnRewardThreshold(self):
-        """import gym
-
-        from stable_baselines3 import SAC
-        from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
-
-        # Separate evaluation env
-        eval_env = gym.make('Pendulum-v1')
-        # Stop training when the model reaches the reward threshold
-        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=-200, verbose=1)
-        eval_callback = EvalCallback(eval_env, callback_on_new_best=callback_on_best, verbose=1)
-
-        model = SAC('MlpPolicy', 'Pendulum-v1', verbose=1)
-        # Almost infinite number of timesteps, but the training will stop
-        # early as soon as the reward threshold is reached
-        model.learn(int(1e10), callback=eval_callback)
-        """
-        pass
-
     def training(self):
-        if self.best:
-            self.training_best()
-        else:
-            self.training_tensorboard()
+        """Training en lançant ce script.
+        Un training complet c'est 30 batchs de 100 000 steps.
 
-    def training_best(self):
-        TIMESTEPS = self.learning_steps
-        batch = int(self.config[self.numero]['batch'])
+        1 batch = 100 000 steps
+        A la fin du batch, sauvegarde du model, permet de stopper un training
+        avant la fin, et de pouvoir le reprendre
 
-        dt_now = datetime.now()
-        dt = dt_now.strftime("%d-%m-%Y | %H:%M")
-        # Temps en secondes du train complet.  periode = 44 ms
-        t = batch * TIMESTEPS * 0.044
-        f = datetime.now() + timedelta(seconds=t)
-        fin = f.strftime("%d-%m-%Y | %H:%M")
-        print(f"\n\nLearn de {TIMESTEPS} à {dt}. Fin à {fin}\n\n")
+        Si vous stoppez avant la fin, il faut déduire les batchs fait dans
+        furuta.ini --> [numero] batch=xxx
+        Le GUI fait cette gymnastique automatiquement.
+        """
+        # Reset du step_maxi, utile si a été modifié par un testing
+        self.env.step_maxi = int(self.config[self.numero]['step_maxi'])
 
-        eval_callback = EvalCallback(self.env,
-                                     best_model_save_path=self.best_model_save_path,
-                                     log_path=self.logdir,
-                                     eval_freq=500,
-                                     deterministic=True,
-                                     render=False)
-        self.load_model()
-        self.model.set_env(self.env)
-        self.model.learn(total_timesteps=TIMESTEPS,
-                         reset_num_timesteps=False,
-                         tb_log_name=f"PPO{self.numero}",
-                         callback=eval_callback)
-
-        # Enregistrement dans *.ini
-        self.config_obj.save_config(self.numero, 'step_total', self.env.step_total)
-        dt_now = datetime.now()
-        dt = dt_now.strftime("%d-%m-%Y | %H:%M")
-        print(f"Sauvegarde du model {self.model_name} à {dt}\n")
-        # Sauvegarde incrementale
-        self.model.save(f"{self.models_dir}/{TIMESTEPS*i}")
-        # Sauvegarde normale
-        self.save_model()
-        self.save_efficiency()
-
-    def training_tensorboard(self):
         TIMESTEPS = self.learning_steps
         batch = int(self.config[self.numero]['batch'])
 
@@ -354,18 +348,101 @@ class TrainTest:
         self.env.close()
 
     def testing(self):
-        # TODO Il faudrait pouvoir choisir le model à tester ?
-
+        """Testing en lançant ce script.
+        Ctrl+C pour quitter
+        """
+        # TODO améliorer
         print("Testing ...")
+        self.load_model()
+        self.model.set_env(self.env)
+        obs = self.env.reset()
+        while 1:
+            action, _states = self.model.predict(obs)
+            obs, rewards, dones, info = self.env.step(action)
+
+    def testing_gui(self):
+        """Testing en lançant avec le GUI.
+
+        """
+        print("Testing ...")
+
+        self.load_model()
+
+        # Modification du step_maxi
+        self.env.step_maxi = int(self.config[self.numero]['step_maxi_testing'])
+
+        self.model.set_env(self.env)
+
+        print(f"Testing lancé ...")
+        obs = self.env.reset()
+        while self.env.continue_env:
+            action, _states = self.model.predict(obs)
+            obs, rewards, dones, info = self.env.step(action)
+        sleep(0.5)
+        del self.env
+        del self
+
+    def training_gui(self):
+        """Training en lançant avec le GUI.
+        Un training complet c'est 30 batchs de 100 000 steps.
+
+        Training de 1 seul batch
+        Stop avec self.current_step = maxi
+        """
+        print("Training ...")
+
+        TIMESTEPS = self.learning_steps
 
         self.load_model()
         self.model.set_env(self.env)
 
-        obs = self.env.reset()
-        while True:
-            action, _states = self.model.predict(obs)
-            obs, rewards, dones, info = self.env.step(action)
+        # # print(dir(self.model.env.envs[0].env))
 
+        dt_now = datetime.now()
+        dt = dt_now.strftime("%d-%m-%Y | %H:%M")
+        print(f"\nApprentissage: "
+              f"Steps total = {self.env.step_total} "
+              f"Learning steps = {self.learning_steps} à {dt}\n")
+
+        checkpoint_callback = CustomCallback(verbose=0)
+
+        self.model.learn(total_timesteps=TIMESTEPS,
+                         reset_num_timesteps=False,
+                         tb_log_name=f"PPO{self.numero}",
+                         callback=checkpoint_callback)
+        print(f"Fin de model.learn()")
+
+        self.save_efficiency()
+        # Enregistrement dans *.ini
+        self.config_obj.save_config(self.numero, 'step_total', self.env.step_total)
+
+        # sauvegarde incrementale
+        self.model.save(f"{self.models_dir}/{self.env.step_total}")
+
+        # Sauvegarde du model courrant
+        dt_now = datetime.now()
+        dt = dt_now.strftime("%d-%m-%Y | %H:%M")
+        print(f"\nFin de l'apprentissage de {self.model_name} à {dt} "
+              f"avec Steps total = {self.env.step_total}")
+
+        self.save_model()
+        self.env.close()
+
+        sleep(0.5)
+        del self.env
+        del self
+
+
+def training(current_dir, config_obj, numero, conn):
+    tt = TrainTest(current_dir, config_obj, numero, conn)
+    tt.training_gui()
+
+
+def testing(current_dir, config_obj, numero, conn):
+    print(f"Testing lancé avec {numero}")
+    tt = TrainTest(current_dir, config_obj, numero, conn)
+    print(f"Objet tt construit !")
+    tt.testing_gui()
 
 
 def main(numero, train_test):
@@ -382,20 +459,20 @@ def main(numero, train_test):
     print("Fichier de configuration:", ini_file)
 
     config_obj = MyConfig(ini_file)
-    tt = TrainTest(current_dir, config_obj, numero)
+    tt = TrainTest(current_dir, config_obj, numero, None)
 
     if train_test == 'train':
         tt.create_model()
-        tt.print_model_attr()
-        tt.training()
+        # # tt.print_model_attr()
+        tt.training_gui()
 
     if train_test == 'test':
-        tt.testing()
+        tt.testing_gui(None)
 
 
 
 if __name__ == '__main__':
-    """python3 train_test.py 100 train"""
+    """python3 train_test.py 102 train"""
 
     print(  f"Usage:\n",
             f"Pour un training:\n",
@@ -404,7 +481,7 @@ if __name__ == '__main__':
             f"    train_test nom_de_l_apprentissage test\n")
 
     try:
-        numero = '101'  #sys.argv[1]
+        numero = sys.argv[1]
     except:
         print(f"Vous devez spécifier le nom de l'apprentissage, 'idem est' son numero\n"
         f"C'est pratique de leur donner un numéro comme nom, ils ne sont pas des êtres\n"

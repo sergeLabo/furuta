@@ -1,0 +1,34 @@
+
+<MainScreen>:
+
+    GridLayout:
+        spacing: 20
+        padding: 20
+        cols: 2
+        rows: 3
+        Button:
+            text: "Testing"
+            on_press: root.do_testing()
+        Button:
+            text: "Training a new model"
+            on_press: root.do_training()
+        Button:
+            text: "Options"
+            on_press: app.open_settings()
+        Button:
+            text: "Stop Training ou Testing"
+            on_press: root.on_stop_testing_training()
+        Button:
+            text: "Quitter"
+            on_press: root.do_quit()
+        Button:
+            text: "Eteindre la PI"
+            on_press: root.do_shutdown()
+
+<ChoiceScreen>:
+    BoxLayout:
+        Button:
+            text: 'My settings button'
+        Button:
+            text: 'Back to menu'
+            on_press: root.manager.current = 'menu'

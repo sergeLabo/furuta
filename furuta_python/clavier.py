@@ -1,4 +1,10 @@
 
+"""
+Interaction avec le pendule au clavier
+"""
+
+from pathlib import Path
+
 from pynput import keyboard
 
 

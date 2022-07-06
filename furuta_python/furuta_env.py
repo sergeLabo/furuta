@@ -7,8 +7,9 @@ import os
 from time import sleep, time_ns, time
 from datetime import datetime
 import json
-from pathlib import Path
 import random
+from pathlib import Path
+from threading import Thread
 
 import numpy as np
 import gym
@@ -30,14 +31,20 @@ class FurutaEnv(gym.Env):
     Un apprentissage = quelques millions de steps, ~1000 cycles
     """
 
-    def __init__(self, current_dir, config_obj, numero):
-
+    def __init__(self, current_dir, config_obj, numero, conn):
+        # TODO doc
         super().__init__()
 
         self.current_dir = current_dir
         self.config_obj = config_obj
         self.config = config_obj.conf
         self.numero = numero
+
+        # Pipe avec GUI
+        self.conn = conn
+        self.continue_env = True
+        self.conn_loop = 1
+        self.receiver_thread()
 
         self.clavier = Clavier()
 
@@ -61,6 +68,8 @@ class FurutaEnv(gym.Env):
 
         # Nombre de steps maxi par cycle
         self.step_maxi = int(self.config[self.numero]['step_maxi'])
+
+        # Optimisation de l'apprentissage tous les
         self.learning_steps = int(self.config[self.numero]['learning_steps'])
 
         # Attente entre la fin de l'impulsion et observation
@@ -91,6 +100,25 @@ class FurutaEnv(gym.Env):
         self.synchro = ""
         self.t_block = time()
 
+    def receiver_thread(self):
+        # TODO doc
+        t = Thread(target=self.receiver)
+        t.start()
+
+    def receiver(self):
+        # TODO doc
+        print("Env Receiver ok")
+        while self.conn_loop:
+            if self.conn is not None:
+                data = self.conn.recv()
+                if data:
+                    if data[0] == 'continue' and data[1] == 0:
+                        print("Stop continue reçu")
+                        self.continue_env = False
+                        self.training_conn_loop = 0
+            sleep(0.3)
+        print("Fin du thread .receiver")
+
     def step(self, action):
         """Un step dans un cycle
                 * action sur le moteur, défini par model.learn()
@@ -103,6 +131,7 @@ class FurutaEnv(gym.Env):
                 * step_maxi atteint
                 * chariot en bout de course
         """
+
         if self.clavier.quit:
             self.close()
 
@@ -153,10 +182,10 @@ class FurutaEnv(gym.Env):
         return obs, rewards, done, {}
 
     def get_pos_speed(self):
-        """L'impulsion moteur dure duration_of_motor_impulse = 0.02 ou 0.03
+        """L'impulsion moteur dure duration_of_motor_impulse = 0.02
         La 2ème observation doit être faite après la fin de l'impulsion.
         self.tempo est le temps entre la fin de l'impulsion moteur et
-        la 2ème observation, tempo_step dans *.ini
+        la 2ème observation, tempo_step dans *.ini soit 0.01
         """
         # Attente pendant l'impulsion moteur
         sleep(self.lenght)  # 0.02
@@ -171,6 +200,7 @@ class FurutaEnv(gym.Env):
             alpha_dot = 0.01 / (a1 - a0)
         else:
             alpha_dot = 0
+
         teta = t1
         if t1 - t0 != 0:
             teta_dot = 0.01 / (t1 - t0)
@@ -191,9 +221,9 @@ class FurutaEnv(gym.Env):
             ici np.finfo(np.float32).max = 3.4028235e+38 ça fait grand
 
         Espace possible des ations:
-            * entre -80 et 80
+            * entre -60 et 60
             * pas de space négatif
-            * il faudra appliquer -80 à l'action pour l'impulsion sur le moteur
+            * il faudra appliquer -60 à l'action pour l'impulsion sur le moteur
         """
         high = np.array([   np.finfo(np.float32).max,
                             np.finfo(np.float32).max,
@@ -212,7 +242,7 @@ class FurutaEnv(gym.Env):
             - Retourne l'observation à la fin  du reset.
         """
         # Attente pour éviter les retards
-        sleep(5)
+        sleep(1)
 
         # Observation
         self.alpha, self.alpha_dot, self.teta, self.teta_dot = self.get_pos_speed()
@@ -323,6 +353,10 @@ class FurutaEnv(gym.Env):
 
 
 if __name__ == "__main__":
+    """
+    Test de ce script avec des valeurs d'actions au hasard
+    """
+
     current_dir = str(Path(__file__).parent.absolute())
     print("Dossier courrant:", current_dir)
     ini_file = current_dir + '/furuta.ini'
