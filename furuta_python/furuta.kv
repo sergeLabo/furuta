@@ -1,0 +1,204 @@
+#:kivy 2.0.0
+# 214,37,152
+
+<IntroScreen>:
+    BoxLayout:  # 1 image
+        Button:
+            background_normal: "images/furuta.png"
+            background_down: "images/rose.png"
+            on_press:
+                root.manager.transition.direction = "left"
+                app.root.current = 'Main'
+
+<MainScreen>:
+    GridLayout: # 6 buttons
+        spacing: 1
+        padding: 1
+        cols: 2
+        rows: 3
+        Button:  # testing
+            size_hint_y: 0.5
+            background_color: 3.1, 0.8, 2.5  # 214, 37,152
+            text: "Testing"
+            color: 0, 0, 0
+            font_size: '48dp'
+            on_press: app.root.current = 'Testing'
+        Button:  # training
+            size_hint_y: 0.5
+            background_color: 3.1, 0.8, 2.5
+            text: "Training"
+            color: 0, 0, 0
+            font_size: '48dp'
+            on_press: app.root.current = 'Training'
+        Button:  # Aide
+            size_hint_y: 0.25
+            background_color: 3.1, 0.8, 2.5
+            color: 0, 0, 0
+            font_size: '48dp'
+            text: "Aide"
+            on_press: app.root.current = 'Aide'
+        Button:  # Credits
+            size_hint_y: 0.25
+            background_color: 3.1, 0.8, 2.5
+            color: 0, 0, 0
+            font_size: '48dp'
+            text: "Crédits"
+            on_press: app.root.current = 'Credits'
+        Button:  # Quitter
+            size_hint_y: 0.25
+            background_color: 3.1, 0.8, 2.5
+            color: 0, 0, 0
+            font_size: '48dp'
+            text: "Quitter"
+            on_press: root.do_quit()
+        Button:  # shutdown
+            size_hint_y: 0.25
+            background_color: 3.1, 0.8, 2.5
+            color: 0, 0, 0
+            font_size: '48dp'
+            text: "Eteindre la PI"
+            on_press: root.do_shutdown()
+
+<TestingScreen>:
+    BoxLayout:  # une boite pour tout
+        orientation: 'vertical'
+        Label:  # Titre de la fenetre
+            canvas.before:
+                Color:
+                    rgb: 1.0, 0.25, 0.8
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            size_hint_y: 0.10
+            color: 0, 0, 0
+            font_size: '24dp'
+            markup: True
+            text: '[b]Testing[/b]'
+        Label:  # Affichage d'info pendant le testing
+            canvas.before:
+                Color:
+                    rgb: 1.0, 0.25, 0.8
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            size_hint_y: 0.65
+            color: 0, 0, 0
+            markup: True
+            font_size: '36dp'
+            text: root.test_info
+        BoxLayout:
+            size_hint_y: 0.25
+            orientation: 'horizontal'
+            Button:  # Retour
+                background_color: 3.1, 0.8, 2.5
+                color: 0, 0, 0
+                markup: True
+                text: "[b]Retour[/b]"
+                font_size: '24dp'
+                on_press: app.root.current = 'Main'
+            Button:  # Start
+                background_color: 3.1, 0.8, 2.5
+                color: 0, 0, 0
+                markup: True
+                text: "[b]Start testing[/b]"
+                font_size: '24dp'
+                on_press: root.start_testing()
+            Button:  # Stop
+                background_color: 3.1, 0.8, 2.5
+                color: 0, 0, 0
+                markup: True
+                text: "[b]Stop testing[/b]"
+                font_size: '24dp'
+                on_press: root.stop_testing()
+
+<CreditsScreen>:
+    Button:  # merci
+        background_normal: "images/credits.png"
+        background_down: "images/credits.png"
+        on_press: app.root.current = 'Main'
+
+<AideScreen>:
+    Button:  # merci
+        background_normal: "images/aide.png"
+        background_down: "images/aide.png"
+        on_press: app.root.current = 'Main'
+
+<TrainingScreen>:
+    BoxLayout:  # une boite pour tout
+        orientation: 'vertical'
+        Label:  # Titre de la fenetre
+            canvas.before:
+                Color:
+                    rgb: 1.0, 0.25, 0.8
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            size_hint_y: 0.10
+            color: 0, 0, 0
+            font_size: '24dp'
+            markup: True
+            text: '[b]Training[/b]'
+        BoxLayout:  # slider pour choisir quand commencer
+            size_hint_y: 0.10
+            canvas.before:
+                Color:
+                    rgb: 1.0, 0.25, 0.8
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            Slider: # parts choice
+                id: parts
+                orientation: 'horizontal'
+                range: 0, 30
+                step: 1
+                value: root.parts
+                value_position: root.parts
+                on_value: root.do_slider('parts', *args)
+        Label:  # valeur du slider
+            canvas.before:
+                Color:
+                    rgb: 1.0, 0.25, 0.8
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            size_hint_y: 0.10
+            color: 0, 0, 0
+            markup: True
+            font_size: '24dp'
+            text: root.slider_value
+        Label:  # Affichage d'info pendant le training
+            canvas.before:
+                Color:
+                    rgb: 1.0, 0.25, 0.8
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            size_hint_y: 0.50
+            color: 0, 0, 0
+            markup: True
+            font_size: '36dp'
+            text: root.train_info
+        BoxLayout:  # 3 buttons du bas
+            size_hint_y: 0.20
+            orientation: 'horizontal'
+            Button:  # Retour
+                background_color: 3.1, 0.8, 2.5
+                color: 0, 0, 0
+                markup: True
+                text: "[b]Retour[/b]"
+                font_size: '24dp'
+                on_press: root.retour()  # app.root.current = 'Main'
+            Button:  # Start
+                background_color: 3.1, 0.8, 2.5
+                color: 0, 0, 0
+                markup: True
+                text: "[b]Start training[/b]"
+                font_size: '24dp'
+                on_press: root.start_training()
+            Button:  # Stop
+                background_color: 3.1, 0.8, 2.5
+                color: 0, 0, 0
+                markup: True
+                text: "[b]Stop training[/b]"
+                font_size: '24dp'
+                on_press: root.stop_training()

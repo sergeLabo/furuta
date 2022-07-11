@@ -1,3 +1,4 @@
+
 """
 Pilotage d'un moteur branché sur le PWM de la Pi
 
@@ -78,6 +79,7 @@ class MyMotor:
         """Active le moteur à la puissance définie par speed
         speed = entier entre 0 et range_pwm
         Cela lance le moteur mais ne le stoppe pas !
+        Il est stoppé par do_impulsion_thread() dans furuta.py
         """
         speed = abs(speed)
 
@@ -97,6 +99,7 @@ class MyMotor:
             os._exit(0)
 
     def stop(self):
+        """Stoppe le moteur"""
         if self.pi:
             self.set_pin_low(self.left)
             self.set_pin_low(self.right)
@@ -104,6 +107,12 @@ class MyMotor:
 
 
 if __name__ == "__main__":
+
+    """Test du moteur au clavier:
+        - a impulsion à droite
+        - z impulsion à gauche
+    pendant 6 secondes.
+    """
 
     from clavier import Clavier
     cl = Clavier()

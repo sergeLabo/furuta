@@ -1,4 +1,9 @@
 
+# TODO à mieux intégrer
+"""
+Dessine les courbes d'efficacité pendant l'apprentissage
+"""
+
 import os, sys
 from pathlib import Path
 import json

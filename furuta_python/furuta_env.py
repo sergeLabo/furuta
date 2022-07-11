@@ -16,7 +16,7 @@ import gym
 from gym import spaces
 
 from my_config import MyConfig
-from furuta import Furuta
+from furuta_hard import Furuta
 from clavier import Clavier
 
 
@@ -32,6 +32,9 @@ class FurutaEnv(gym.Env):
     """
 
     def __init__(self, current_dir, config_obj, numero, conn):
+        """receiver_thread() ne sert que si test et train lancé avec le gui
+
+        """
         # TODO doc
         super().__init__()
 
@@ -43,10 +46,12 @@ class FurutaEnv(gym.Env):
         # Pipe avec GUI
         self.conn = conn
         self.continue_env = True
-        self.conn_loop = 1
-        self.receiver_thread()
-
-        self.clavier = Clavier()
+        self.conn_loop = 0
+        self.GUI = 1
+        if not self.GUI:
+            self.clavier = Clavier()
+        else:
+            self.clavier = None
 
         # L'objet hardware furuta
         self.furuta = Furuta(config_obj, numero, self.clavier)
@@ -82,9 +87,11 @@ class FurutaEnv(gym.Env):
         self.cycle_number = 0 # suivi du nombre de cycle
         self.batch_step = 0  # nombre de step réalisé pour un batch
         self.t_step = time_ns()  # calcul du temps par step
-        self.cycle_reward = 0  # Efficacité du cycle
-        self.efficiency = 0
-        self.reason = ""
+        self.cycle_reward = 0  # Récompense totale en cours de cycle
+        self.efficiency = 0  # Efficacité du cycle
+        self.reason = ""  # pour affichage
+        # steps depuis le début d'un apprentissage pour training GUI
+        self.from_beginning = 0
 
         # Datas enregistrés
         self.datas = []
@@ -101,21 +108,34 @@ class FurutaEnv(gym.Env):
         self.t_block = time()
 
     def receiver_thread(self):
-        # TODO doc
+        """Thread pour recevoir le stop pendant le training"""
         t = Thread(target=self.receiver)
+        self.conn_loop = 1
         t.start()
 
     def receiver(self):
-        # TODO doc
+        """Boucle infinie Thread pour recevoir le stop pendant le training"""
         print("Env Receiver ok")
         while self.conn_loop:
+            # # print("toto")
             if self.conn is not None:
                 data = self.conn.recv()
+                # # print("data reçu dans furuta_env:", data)
                 if data:
-                    if data[0] == 'continue' and data[1] == 0:
-                        print("Stop continue reçu")
+                    if data == ['continue', 0]:
+                        print("Dans furuta_env, continue=0 reçu")
                         self.continue_env = False
-                        self.training_conn_loop = 0
+                        self.conn_loop = 0
+                    if data[0] == 'woke':
+                        # # print("woke")
+                        pass
+
+                # Envoi des infos
+                self.conn.send([ 'infos',
+                                 self.current_step,
+                                 int(self.cycle_reward),
+                                 self.from_beginning])
+
             sleep(0.3)
         print("Fin du thread .receiver")
 
@@ -131,9 +151,9 @@ class FurutaEnv(gym.Env):
                 * step_maxi atteint
                 * chariot en bout de course
         """
-
-        if self.clavier.quit:
-            self.close()
+        if self.clavier:
+            if self.clavier.quit:
+                self.close()
 
         # Si action de 0 à 160, impulsion de -80 à 80, sens left si < 0
         puissance = int(action - self.puissance_maxi)
@@ -173,6 +193,7 @@ class FurutaEnv(gym.Env):
                         np.float(np.sin(self.teta)),
                         np.float(self.teta_dot)])
 
+        self.from_beginning += 1
         self.current_step += 1
         self.step_total += 1
         self.batch_step += 1
@@ -293,32 +314,33 @@ class FurutaEnv(gym.Env):
             - j pour les événements à chaque step
             - k pour alpha, teta, alpha', teta' en gros pour video
         """
-        if self.clavier.j:
-            tttt = int((time_ns() - self.t_step)/1000000)
-            self.t_step = time_ns()
-            a = round(self.alpha, 3)
-            ca = round(np.cos(self.alpha/2), 3)
-            t = round(self.teta, 3)
-            st = round(np.sin(self.teta/2), 3)
-            va = round(self.alpha_dot, 3)
-            vt = round(self.teta_dot, 3)
-            if sens == 'left': sens = 'left '
+        if self.clavier:
+            if self.clavier.j:
+                tttt = int((time_ns() - self.t_step)/1000000)
+                self.t_step = time_ns()
+                a = round(self.alpha, 3)
+                ca = round(np.cos(self.alpha/2), 3)
+                t = round(self.teta, 3)
+                st = round(np.sin(self.teta/2), 3)
+                va = round(self.alpha_dot, 3)
+                vt = round(self.teta_dot, 3)
+                if sens == 'left': sens = 'left '
 
-            print(f"Num {self.current_step:^7} "
-                  f"action {action:^4}  puissance {puissance:^6} "
-                  f"sens {sens}    "
-                  f"alpha {a:^7} teta {t:^7} "
-                  f"cos_alpha/2 {ca:^7}"
-                  f"sin_teta/2 {st:^7} "
-                  f"rewards {round(rewards, 3):^6} "
-                  f"vitesse_alpha {va:^9} vitesse_teta {vt:^9} "
-                  f"Durée {tttt:^4}")
-        if self.clavier.l:
-            a = round(self.alpha, 1)
-            t = round(self.teta, 1)
-            va = round(self.alpha_dot, 3)
-            vt = round(self.teta_dot, 3)
-            print(f"a: {a:^7} t: {t:^7} va: {va:^7} vt: {vt:^7} ")
+                print(f"Num {self.current_step:^7} "
+                      f"action {action:^4}  puissance {puissance:^6} "
+                      f"sens {sens}    "
+                      f"alpha {a:^7} teta {t:^7} "
+                      f"cos_alpha/2 {ca:^7}"
+                      f"sin_teta/2 {st:^7} "
+                      f"rewards {round(rewards, 3):^6} "
+                      f"vitesse_alpha {va:^9} vitesse_teta {vt:^9} "
+                      f"Durée {tttt:^4}")
+            if self.clavier.l:
+                a = round(self.alpha, 1)
+                t = round(self.teta, 1)
+                va = round(self.alpha_dot, 3)
+                vt = round(self.teta_dot, 3)
+                print(f"a: {a:^7} t: {t:^7} va: {va:^7} vt: {vt:^7} ")
 
     def get_reward(self):
         """Calcul de la récompense.
@@ -363,7 +385,7 @@ if __name__ == "__main__":
     print("Fichier de configuration:", ini_file)
     cf = MyConfig(ini_file)
 
-    fe = FurutaEnv(current_dir, cf , '100')
+    fe = FurutaEnv(None, current_dir, cf , '100')
 
     while 1:
         action = random.randint(60, 100)

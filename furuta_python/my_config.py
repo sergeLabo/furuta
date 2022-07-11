@@ -3,15 +3,16 @@
 Charge une configuration à partir d'un fichier *.ini
 """
 
+# FIXME en cours de test!::
 
 from configparser import SafeConfigParser
 
 
 class MyConfig():
     """
-    Charge la configuration depuis le fichier *.ini,
-    sauve les changement de configuration,
-    enregistre les changements par section, clé.
+    Charge la configuration depuis le fichier *.ini.
+    Enregistre les changements par section, clé.
+    Ajoute une section.
     """
 
     def __init__(self, ini_file, verbose=1):
@@ -20,22 +21,23 @@ class MyConfig():
         Le chemin doit être donné avec son chemin absolu.
         """
 
-        self.conf = {}
         self.ini = ini_file
         self.verbose = verbose
+        self.parser = None
+        self.conf = {}
         self.load_config()
 
 
     def load_config(self):
         """Lit le fichier *.ini, et copie la config dans un dictionnaire."""
 
-        parser = SafeConfigParser()
-        parser.read(self.ini, encoding="utf-8")
+        self.parser = SafeConfigParser()
+        self.parser.read(self.ini, encoding="utf-8")
 
         # Lecture et copie dans le dictionnaire
-        for section_name in parser.sections():
+        for section_name in self.parser.sections():
             self.conf[section_name] = {}
-            for key, value in parser.items(section_name):
+            for key, value in self.parser.items(section_name):
                 self.conf[section_name][key] = value
 
         if self.verbose:
@@ -56,13 +58,20 @@ class MyConfig():
         if isinstance(value, float):
             val = str(value)
         if isinstance(value, str):
-            val = """ + value + """
+            val = value
 
-        config = SafeConfigParser()
-        config.read(self.ini)
-        config.set(section, key, val)
+        self.parser = SafeConfigParser()
+        self.parser.read(self.ini)
+        self.parser.set(section, key, val)
+
         with open(self.ini, "w") as f:
-            config.write(f)
-        f.close()
+            self.parser.write(f)
+
         if self.verbose:
             print(f"Section={section} key={key} val={val} saved in {self.ini}\n")
+
+    def add_section(section):
+
+        self.parser.add_section(section)
+        with open(self.ini, "w") as f:
+            self.parser.write(f)

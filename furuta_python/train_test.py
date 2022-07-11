@@ -68,10 +68,9 @@ class TrainTest:
         # Le dict de la configuration
         self.config = config_obj.conf
         self.numero = numero  # str
+
         # Pipe
         self.conn = conn
-        self.testing_conn_loop = 1
-        self.testing_loop = 1
 
         self.learning_steps = int(self.config[self.numero]['learning_steps'])
         self.learning_rate = float(self.config[self.numero]['learning_rate'])
@@ -368,6 +367,9 @@ class TrainTest:
 
         self.load_model()
 
+        # Lancement du thread pour stopper avec le GUI
+        self.env.receiver_thread()
+
         # Modification du step_maxi
         self.env.step_maxi = int(self.config[self.numero]['step_maxi_testing'])
 
@@ -379,24 +381,28 @@ class TrainTest:
             action, _states = self.model.predict(obs)
             obs, rewards, dones, info = self.env.step(action)
         sleep(0.5)
-        del self.env
-        del self
+        self.env.close()
 
-    def training_gui(self):
+    def training_gui(self, parts):
         """Training en lançant avec le GUI.
         Un training complet c'est 30 batchs de 100 000 steps.
 
         Training de 1 seul batch
         Stop avec self.current_step = maxi
         """
-        print("Training ...")
+        print(f"Training ... avec le GUI ... parts={parts}")
+
+        # Lancement du thread pour stopper avec le GUI
+        self.env.receiver_thread()
 
         TIMESTEPS = self.learning_steps
 
-        self.load_model()
+        model_file = self.get_demo_model_file(parts)
+        # # model_file = "/home/serge/projets/furuta_python/models/PPO102/init.zip"
+        print(model_file)
+        self.model = PPO.load(model_file, cloudpickle=False, verbose=0)
+        print(self.model)
         self.model.set_env(self.env)
-
-        # # print(dir(self.model.env.envs[0].env))
 
         dt_now = datetime.now()
         dt = dt_now.strftime("%d-%m-%Y | %H:%M")
@@ -412,30 +418,44 @@ class TrainTest:
                          callback=checkpoint_callback)
         print(f"Fin de model.learn()")
 
-        self.save_efficiency()
-        # Enregistrement dans *.ini
-        self.config_obj.save_config(self.numero, 'step_total', self.env.step_total)
-
-        # sauvegarde incrementale
-        self.model.save(f"{self.models_dir}/{self.env.step_total}")
-
         # Sauvegarde du model courrant
         dt_now = datetime.now()
         dt = dt_now.strftime("%d-%m-%Y | %H:%M")
         print(f"\nFin de l'apprentissage de {self.model_name} à {dt} "
               f"avec Steps total = {self.env.step_total}")
 
-        self.save_model()
         self.env.close()
-
         sleep(0.5)
         del self.env
         del self
 
+    def get_demo_model_file(self, parts):
+        """De 0 à 2 900 000 .zip dans ./models/PPO102/
 
-def training(current_dir, config_obj, numero, conn):
+        parts de 0 à 29 soit 30 fichiers
+            0 --> 0
+            1 --> 100000
+            29 --> 2900000
+        + init.zip non entrainé
+        """
+        if parts == 0:
+            model_file = f"{models_dir}/init.zip"
+        else:
+            # parts de 1 à 30 devient 0 à 29
+            parts -= 1
+            models_dir = f"{self.current_dir}/models/PPO102"
+            if parts == 0:
+                model_file = f"{models_dir}/0.zip"
+            else:
+                model_file = f"{models_dir}/{parts}00000.zip"
+        print(f"Fichier model pour le Training GUI = {model_file}")
+        return model_file
+
+
+
+def training(current_dir, config_obj, numero, conn, parts):
     tt = TrainTest(current_dir, config_obj, numero, conn)
-    tt.training_gui()
+    tt.training_gui(parts)
 
 
 def testing(current_dir, config_obj, numero, conn):
@@ -464,39 +484,41 @@ def main(numero, train_test):
     if train_test == 'train':
         tt.create_model()
         # # tt.print_model_attr()
-        tt.training_gui()
+        tt.training_gui(0)
 
     if train_test == 'test':
-        tt.testing_gui(None)
+        tt.testing(None)
 
 
 
 if __name__ == '__main__':
     """python3 train_test.py 102 train"""
 
-    print(  f"Usage:\n",
-            f"Pour un training:\n",
-            f"    train_test nom_de_l_apprentissage train\n",
-            f"Pour un testing:\n",
-            f"    train_test nom_de_l_apprentissage test\n")
+    main('102', 'train')
 
-    try:
-        numero = sys.argv[1]
-    except:
-        print(f"Vous devez spécifier le nom de l'apprentissage, 'idem est' son numero\n"
-        f"C'est pratique de leur donner un numéro comme nom, ils ne sont pas des êtres\n"
-        f"humains, ils sont des numéros (et peut-être même numéro 6 ou ... numéro 1,"
-        f" pourquoi pas!)")
-        sys.exit()
+    # # print(  f"Usage:\n",
+            # # f"Pour un training:\n",
+            # # f"    train_test nom_de_l_apprentissage train\n",
+            # # f"Pour un testing:\n",
+            # # f"    train_test nom_de_l_apprentissage test\n")
 
-    try:
-        train_test = 'train'  #sys.argv[2]
-    except:
-        print(f"Vous devez spécifier train ou test")
-        sys.exit()
+    # # try:
+        # # numero = sys.argv[1]
+    # # except:
+        # # print(f"Vous devez spécifier le nom de l'apprentissage, 'idem est' son numero\n"
+        # # f"C'est pratique de leur donner un numéro comme nom, ils ne sont pas des êtres\n"
+        # # f"humains, ils sont des numéros (et peut-être même numéro 6 ou ... numéro 1,"
+        # # f" pourquoi pas!)")
+        # # sys.exit()
 
-    if train_test not in ['train', 'test']:
-        print(f"Vous devez spécifier train ou test")
-        sys.exit()
+    # # try:
+        # # train_test = 'train'  #sys.argv[2]
+    # # except:
+        # # print(f"Vous devez spécifier train ou test")
+        # # sys.exit()
 
-    main(numero, train_test)
+    # # if train_test not in ['train', 'test']:
+        # # print(f"Vous devez spécifier train ou test")
+        # # sys.exit()
+
+    # # main(numero, train_test)

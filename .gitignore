@@ -8,7 +8,7 @@ datas/
 logs/
 models/
 exclude/
-
+furuta_python_1/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

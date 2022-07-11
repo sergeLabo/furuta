@@ -128,28 +128,31 @@ class RotaryEncoder:
         self.pi.set_mode(gpio, mode)
 
     def encoder_receive_thread(self):
+        """Thread pour quitter en stoppant le pigpio"""
         print(f"Lancement du thread receive dans rotary_encoder du {self.name}")
         t = Thread(target=self.encoder_receive)
         t.start()
 
     def encoder_receive(self):
+        """Boucle infinie du Thread pour quitter en stoppant le pigpio"""
         while self.encoder_conn_loop:
             data = self.conn.recv()
 
             if data:
                 if data[0] == 'quit':
-                    print("quit reçu dans rotary_encoder", self.name)
+                    print(f"quit reçu dans rotary_encoder {self.name}")
                     self.encoder_conn_loop = 0
                     self.cancel()
             sleep(1)
 
-        print("Fin du thread de l'encoder", self.name)
+        print(f"Fin du thread du codeur du {self.name}")
 
     def cancel(self):
+        """Pour quitter proprement"""
         self.cbA.cancel()
         self.cbB.cancel()
         self.pi.stop()
-        print("Rotary encoder Fin de", self.name)
+        print(f"Rotary encoder Fin du codeur du {self.name}")
 
 
 

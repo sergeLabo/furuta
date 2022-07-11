@@ -35,6 +35,11 @@ Un apprentissage dure 3 millions de steps,
 soit 30 batchs de 100 000 steps
 
 ### Test = Testing
+Lancè avec "Testing"
+
+Le model testé est le "102".\\
+Il est possible de changer ce choix dans les options, mais vous devez être sûr que votre model est bon !
+
 
 ### GUI
 Pour une utilisation simple du pendule par un néophyte en IA (Hi..Han..)
