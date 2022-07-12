@@ -3,12 +3,17 @@ old/
 *.geany
 *.project
 *.geanywb
+*.blend1
 mon_env/
 datas/
 logs/
 models/
 exclude/
 furuta_python_1/
+furuta_python_2/
+furuta_esp32_1/
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -12,8 +12,8 @@ from threading import Thread
 
 from kivy.app import App
 from kivy.core.window import Window
-Window.size = (800, 480)
-# # Window.fullscreen = True
+# # Window.size = (800, 480)
+Window.fullscreen = True
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.properties import StringProperty, NumericProperty
 from kivy.clock import Clock
@@ -64,7 +64,7 @@ class TestingScreen(Screen):
         self.testing_processus = None
         self.testing_conn = None
         self.testing_conn_loop = 0
-        self.test_info = "un peu de chifres\nun peu de texte"
+        self.test_info = ""
 
     def model_choice(self):
         self.stop_testing()

@@ -149,6 +149,9 @@
             Slider: # parts choice
                 id: parts
                 orientation: 'horizontal'
+                value_track: True
+                value_track_color: 0, 0, 0, 1
+                cursor_image: './images/rond.png'
                 range: 0, 30
                 step: 1
                 value: root.parts
@@ -178,9 +181,12 @@
             markup: True
             font_size: '36dp'
             text: root.train_info
-        BoxLayout:  # 3 buttons du bas
+        GridLayout:  # 3 buttons du bas
+            spacing: 1
+            padding: 1
+            cols: 3
+            rows: 1
             size_hint_y: 0.20
-            orientation: 'horizontal'
             Button:  # Retour
                 background_color: 3.1, 0.8, 2.5
                 color: 0, 0, 0

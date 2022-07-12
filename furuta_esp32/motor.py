@@ -94,7 +94,6 @@ class MyMotor:
         except:
             print(f"Si il y a une erreur qui suit, elle vient d'une action sur le moteur "
                   f"demandée alors que pigpio est stoppé !!!!!!!!!!!!!!")
-            os._exit(0)
 
     def stop(self):
         if self.pi:

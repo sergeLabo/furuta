@@ -108,20 +108,17 @@ class FurutaEnv(gym.Env):
 
         # Si action de 0 à 160, impulsion de -80 à 80, sens left si < 0
         puissance = int(action - self.puissance_maxi)
-
         if puissance < 0:
             sens = 'left'
         else:
             sens = 'right'
         puissance = abs(puissance)
-
         if self.furuta:  # pour ne pas demander d'impulsion si quit !
             self.furuta.impulsion_moteur(puissance, self.lenght, sens)
 
         sleep(self.tempo)
 
         self.alpha, self.alpha_dot, self.teta, self.teta_dot = self.furuta.shot()
-        # # print(self.alpha, self.alpha_dot, self.teta, self.teta_dot)
 
         # Si done est True, arrêt du cycle
         done = False
@@ -209,7 +206,7 @@ class FurutaEnv(gym.Env):
         dt_now = datetime.now()
         dt = dt_now.strftime("%d-%m-%Y | %H:%M")
         print( f"{dt} Reset: {self.reason:<16} "
-                f"batch: {self.batch} "
+                f"batch: {self.batch+1} "
                 f"Step du batch = {self.batch_step}/{self.learning_steps} "
                 f"Total des steps = {self.step_total:<10} "
                 f"Cycle = {self.cycle_number:<6} "
