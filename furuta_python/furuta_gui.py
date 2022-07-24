@@ -136,6 +136,10 @@ class TestingScreen(Screen):
                            f"Step numéro:  {current_step}\n\n"
                            f"Récompense moyenne du cycle:  {round(r, 2)}[/b]")
 
+    def retour(self):
+        self.stop_testing()
+        self.app.screen_manager.current = ("Main")
+
     def stop_testing(self):
         print("Stop testing demandé ...")
         if self.block:
@@ -251,7 +255,7 @@ class TrainingScreen(Screen):
                                                    config_obj,
                                                    self.numero,
                                                    child_conn,
-                                                   0 ))
+                                                   self.parts ))
             self.training_processus.start()
             print("Process Training lancé")
 
