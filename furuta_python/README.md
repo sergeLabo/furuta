@@ -15,7 +15,7 @@ python3 -m pip install -r requirements_minimal.txt
 ```
 #### Autostart
 Coller les fichiers de <br />
-./furuta/furuta_python/autostart/ <br />
+[https://github.com/sergeLabo/furuta/tree/main/furuta_python/autostart](./furuta/furuta_python/autostart/) <br />
 dans <br />
 ~/.config/autostart
 
