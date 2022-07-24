@@ -1,0 +1,4 @@
+[Desktop Entry]
+Type=Application
+Name=pigpio autostart
+Exec=sudo pigpiod -s 5

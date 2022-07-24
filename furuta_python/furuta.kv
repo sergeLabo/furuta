@@ -6,7 +6,7 @@
         Button:
             background_normal: "images/furuta.png"
             background_down: "images/rose.png"
-            on_press:
+            on_release:
                 root.manager.transition.direction = "left"
                 app.root.current = 'Main'
 
@@ -18,46 +18,46 @@
         rows: 3
         Button:  # testing
             size_hint_y: 0.5
-            background_color: 3.1, 0.8, 2.5  # 214, 37,152
+            background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
             text: "Testing"
             color: 0, 0, 0
             font_size: '48dp'
-            on_press: app.root.current = 'Testing'
+            on_release: app.root.current = 'Testing'
         Button:  # training
             size_hint_y: 0.5
-            background_color: 3.1, 0.8, 2.5
+            background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
             text: "Training"
             color: 0, 0, 0
             font_size: '48dp'
-            on_press: app.root.current = 'Training'
+            on_release: app.root.current = 'Training'
         Button:  # Aide
             size_hint_y: 0.25
-            background_color: 3.1, 0.8, 2.5
+            background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
             color: 0, 0, 0
             font_size: '48dp'
             text: "Aide"
-            on_press: app.root.current = 'Aide'
+            on_release: app.root.current = 'Aide'
         Button:  # Credits
             size_hint_y: 0.25
-            background_color: 3.1, 0.8, 2.5
+            background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
             color: 0, 0, 0
             font_size: '48dp'
             text: "Crédits"
-            on_press: app.root.current = 'Credits'
+            on_release: app.root.current = 'Credits'
         Button:  # Quitter
             size_hint_y: 0.25
-            background_color: 3.1, 0.8, 2.5
+            background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
             color: 0, 0, 0
             font_size: '48dp'
             text: "Quitter"
-            on_press: root.do_quit()
+            on_release: root.do_quit()
         Button:  # shutdown
             size_hint_y: 0.25
-            background_color: 3.1, 0.8, 2.5
+            background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
             color: 0, 0, 0
             font_size: '48dp'
             text: "Eteindre la PI"
-            on_press: root.do_shutdown()
+            on_release: root.do_shutdown()
 
 <TestingScreen>:
     BoxLayout:  # une boite pour tout
@@ -90,38 +90,38 @@
             size_hint_y: 0.25
             orientation: 'horizontal'
             Button:  # Retour
-                background_color: 3.1, 0.8, 2.5
+                background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
                 color: 0, 0, 0
                 markup: True
                 text: "[b]Retour[/b]"
                 font_size: '24dp'
-                on_press: app.root.current = 'Main'
+                on_release: app.root.current = 'Main'
             Button:  # Start
-                background_color: 3.1, 0.8, 2.5
+                background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
                 color: 0, 0, 0
                 markup: True
                 text: "[b]Start testing[/b]"
                 font_size: '24dp'
-                on_press: root.start_testing()
+                on_release: root.start_testing()
             Button:  # Stop
-                background_color: 3.1, 0.8, 2.5
+                background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
                 color: 0, 0, 0
                 markup: True
                 text: "[b]Stop testing[/b]"
                 font_size: '24dp'
-                on_press: root.stop_testing()
+                on_release: root.stop_testing()
 
 <CreditsScreen>:
     Button:  # merci
         background_normal: "images/credits.png"
         background_down: "images/credits.png"
-        on_press: app.root.current = 'Main'
+        on_release: app.root.current = 'Main'
 
 <AideScreen>:
     Button:  # merci
         background_normal: "images/aide.png"
         background_down: "images/aide.png"
-        on_press: app.root.current = 'Main'
+        on_release: app.root.current = 'Main'
 
 <TrainingScreen>:
     BoxLayout:  # une boite pour tout
@@ -188,23 +188,24 @@
             rows: 1
             size_hint_y: 0.20
             Button:  # Retour
-                background_color: 3.1, 0.8, 2.5
+                background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
                 color: 0, 0, 0
                 markup: True
                 text: "[b]Retour[/b]"
                 font_size: '24dp'
-                on_press: root.retour()  # app.root.current = 'Main'
+                on_release: root.retour()  # app.root.current = 'Main'
             Button:  # Start
-                background_color: 3.1, 0.8, 2.5
+                id: start
+                background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
                 color: 0, 0, 0
                 markup: True
                 text: "[b]Start training[/b]"
                 font_size: '24dp'
-                on_press: root.start_training()
+                on_release: root.start_training()
             Button:  # Stop
-                background_color: 3.1, 0.8, 2.5
+                background_color: (3.1, 0.8, 2.5) if self.state == 'normal' else (0,0,0, 1)
                 color: 0, 0, 0
                 markup: True
                 text: "[b]Stop training[/b]"
                 font_size: '24dp'
-                on_press: root.stop_training()
+                on_release: root.stop_training()

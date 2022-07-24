@@ -13,7 +13,9 @@ from threading import Thread
 from kivy.app import App
 from kivy.core.window import Window
 # # Window.size = (800, 480)
-Window.fullscreen = True
+# # Window.fullscreen = True
+Window.maximize()
+
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.properties import StringProperty, NumericProperty
 from kivy.clock import Clock
@@ -21,17 +23,25 @@ from kivy.clock import Clock
 from train_test import testing, training
 from my_config import MyConfig
 
+
+
 class IntroScreen(Screen):
     """Ecran intro avec 1 image"""
     pass
+
+
 
 class CreditsScreen(Screen):
     """Ecran credit avec 1 image"""
     pass
 
+
+
 class AideScreen(Screen):
     """Ecran aide avec 1 image"""
     pass
+
+
 
 class MainScreen(Screen):
     """Ecran principal avec 6 buttons"""
@@ -44,6 +54,8 @@ class MainScreen(Screen):
 
     def do_shutdown(self):
         subprocess.run(['sudo', 'shutdown', '-h', 'now'])
+
+
 
 class TestingScreen(Screen):
     """Ecran affiché pendant un testing.
@@ -66,6 +78,22 @@ class TestingScreen(Screen):
         self.testing_conn_loop = 0
         self.test_info = ""
 
+    def enable_block(self):
+        """Block si self.block == 1
+        le bouton start est noir
+        """
+        self.block = 1
+        # # self.ids.start.disable = True
+        # # self.ids.start.background_color = (0,0,0,1)
+
+    def disable_block(self):
+        """Block si self.block == 1
+        le bouton start est noir
+        """
+        self.block = 0
+        # # self.ids.start.disable = False
+        # # self.ids.start.background_color = (3.1, 0.8, 2.5, 1)
+
     def model_choice(self):
         self.stop_testing()
         sleep(1)
@@ -73,7 +101,7 @@ class TestingScreen(Screen):
 
     def start_testing(self):
         if not self.block:
-            self.block = 1
+            self.enable_block()
             current_dir = str(Path(__file__).parent.absolute())
             ini_file = current_dir + '/furuta.ini'
             config_obj = MyConfig(ini_file)
@@ -111,7 +139,7 @@ class TestingScreen(Screen):
     def stop_testing(self):
         print("Stop testing demandé ...")
         if self.block:
-            self.block = 0
+            self.disable_block()
             if self.testing_conn is not None:
                 print("Envoi de continue=0")
                 self.testing_conn.send(['continue', 0])
@@ -122,6 +150,8 @@ class TestingScreen(Screen):
             self.conn_loop = 0
             Clock.unschedule(self.update_infos)
         print(f"Stop testing ok.")
+
+
 
 class TrainingScreen(Screen):
 
@@ -147,12 +177,29 @@ class TrainingScreen(Screen):
         self.slider_value = f"Steps du model initial: 0"
         self.steps_from_beginning = 0
         self.steps_total = 0
+        self.steps_init = 0
+
+    def enable_block(self):
+        """Block si self.block == 1
+        le bouton start est noir
+        """
+        self.block = 1
+        self.ids.start.disable = True
+        self.ids.start.background_color = (0,0,0,1)
+
+    def disable_block(self):
+        """Block si self.block == 1
+        le bouton start est noir
+        """
+        self.block = 0
+        self.ids.start.disable = False
+        self.ids.start.background_color = (3.1, 0.8, 2.5, 1)
 
     def do_slider(self, iD, instance, value):
         if self.block:
             self.stop_training()
             sleep(2)
-            self.block = 0
+            self.enable_block()
 
         if iD == 'parts':
             print(f"Slider {iD} {instance} {value}")
@@ -185,14 +232,15 @@ class TrainingScreen(Screen):
         t.start()
 
     def slider_active(self):
+        self.ids.start.background_color = (0,0,0,1)
         while time() - self.slider_on_time < 3:
             sleep(0.1)
         print("Déblockage du slider")
+        self.ids.start.background_color = (3.1, 0.8, 2.5, 1)
         self.slider_thread_active = 0
 
     def start_training(self):
         if not self.block:
-            self.block = 1
             current_dir = str(Path(__file__).parent.absolute())
             ini_file = current_dir + '/furuta.ini'
             config_obj = MyConfig(ini_file)
@@ -203,9 +251,12 @@ class TrainingScreen(Screen):
                                                    config_obj,
                                                    self.numero,
                                                    child_conn,
-                                                   self.parts ))
+                                                   0 ))
             self.training_processus.start()
-            print("Process Testing lancé")
+            print("Process Training lancé")
+
+            # Pour ne pas lancer 2 fois
+            self.enable_block()
 
             # Appel tous les 1 seconde
             Clock.schedule_interval(self.update_infos, 1)
@@ -235,11 +286,12 @@ class TrainingScreen(Screen):
     def stop_training(self):
         print("Stop training demandé ...")
         if self.block:
-            self.block = 0
+            self.disable_block()
             if self.training_conn is not None:
                 print("Envoi de continue=0")
                 self.training_conn.send(['continue', 0])
-            self.training_processus.terminate()
+            if self.training_processus:
+                self.training_processus.terminate()
             sleep(0.5)
             self.training_conn = None
             self.training_processus = None

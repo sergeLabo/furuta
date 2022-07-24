@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Furuta
+NoDisplay=true
+Exec=/home/serge/furuta_autostart.sh

@@ -398,10 +398,9 @@ class TrainTest:
         TIMESTEPS = self.learning_steps
 
         model_file = self.get_demo_model_file(parts)
-        # # model_file = "/home/serge/projets/furuta_python/models/PPO102/init.zip"
-        print(model_file)
+        print(f"training model_file = {model_file}")
         self.model = PPO.load(model_file, cloudpickle=False, verbose=0)
-        print(self.model)
+        print(f"Type de self.model = {type(self.model)}")
         self.model.set_env(self.env)
 
         dt_now = datetime.now()
@@ -430,25 +429,21 @@ class TrainTest:
         del self
 
     def get_demo_model_file(self, parts):
-        """De 0 à 2 900 000 .zip dans ./models/PPO102/
+        """De 000 000 à 2 900 000 .zip dans ./models/PPO102/
 
         parts de 0 à 29 soit 30 fichiers
-            0 --> 0
-            1 --> 100000
+            0 -->   000000
+            1 -->   100000
             29 --> 2900000
-        + init.zip non entrainé
         """
-        if parts == 0:
-            model_file = f"{models_dir}/init.zip"
-        else:
-            # parts de 1 à 30 devient 0 à 29
-            parts -= 1
-            models_dir = f"{self.current_dir}/models/PPO102"
-            if parts == 0:
-                model_file = f"{models_dir}/0.zip"
-            else:
-                model_file = f"{models_dir}/{parts}00000.zip"
+
+        models_dir = f"{self.current_dir}/models/PPO102"
+        # # if parts == 0:
+            # # model_file = f"{models_dir}/0.zip"
+        # # else:
+        model_file = f"{models_dir}/{parts}00000.zip"
         print(f"Fichier model pour le Training GUI = {model_file}")
+
         return model_file
 
 
