@@ -1,7 +1,10 @@
+
 #include <AS5048A.h>
 
 // SS device select true = debug
-AS5048A angleSensor(SS, true);
+AS5048A angleSensor(2, true);
+
+
 
 void setup()
 {
