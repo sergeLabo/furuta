@@ -1,4 +1,4 @@
-# Furuta Python
+# Petit Pendule de Furuta tout en Python
 
 Version du soft de pilotage du Petit Pendule tout en python
 
