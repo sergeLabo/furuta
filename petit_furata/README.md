@@ -3,13 +3,13 @@
 Version du soft de pilotage du Petit Pendule tout en python
 
 ### Documentation complémentaire
-* [Toutes les pages sur le petit pendule de Furuta @ resources.labomedia.org](https://resources.labomedia.org)
+* [Toutes les pages sur le petit pendule de Furuta](https://ressources.labomedia.org/tag/petit_pendule_furuta?do=showtag&tag=petit_pendule_furuta)
 
 ### Installation
 * [Installer Raspberry Pi OS (64-bit)](https://www.raspberrypi.com/software/operating-systems/): le 64 bit est obligatoire car un des packages python n'existe qu'en 64 bit pour ARM.
 
 #### Python
-Dans le dossier [furuta/petit_furata](https://github.com/sergeLabo/furuta/petit_furata):
+Dans le dossier [furuta/petit_furata](https://github.com/sergeLabo/furuta/tree/main/petit_furata):
 ``` bash
 python3 -m pip install -r requirements_minimal.txt
 ```
