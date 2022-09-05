@@ -15,14 +15,14 @@ python3 -m pip install -r requirements_minimal.txt
 ```
 #### Autostart
 Coller les fichiers de <br />
-[autostart](https://github.com/sergeLabo/furuta/tree/main/furuta_python/autostart) <br />
+[autostart](https://github.com/sergeLabo/furuta/tree/main/petit_furata/furuta_python/autostart) <br />
 dans <br />
 ~/.config/autostart
 
 Coller les fichiers
-[furuta_autostart.sh](https://github.com/sergeLabo/furuta/blob/main/furuta_python/furuta_autostart.sh) et [hdmi_autostart.sh](https://github.com/sergeLabo/furuta/blob/main/furuta_python/hdmi_autostart.sh) dans le home de la pi
+[furuta_autostart.sh](https://github.com/sergeLabo/furuta/blob/main/petit_furata/furuta_python/furuta_autostart.sh) et [hdmi_autostart.sh](https://github.com/sergeLabo/furuta/blob/main/petit_furata/furuta_python/hdmi_autostart.sh) dans le home de la pi
 
-Créer un lien furuta dans /usr/local/bin qui pointe vers [run_furuta_gui.sh](https://github.com/sergeLabo/furuta/blob/main/furuta_python/run_furuta_gui.sh)
+Créer un lien furuta dans /usr/local/bin qui pointe vers [run_furuta_gui.sh](https://github.com/sergeLabo/furuta/blob/main/petit_furata/furuta_python/run_furuta_gui.sh)
 ``` bash
 sudo ln -s /vers/le/dossier/furuta_python/run_furuta_gui.sh /usr/local/bin/furuta
 ```
