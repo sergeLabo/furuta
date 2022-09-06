@@ -21,7 +21,7 @@ CE = 8
 pi = pigpio.pi()
 sensor = pi.spi_open(0, 1000000, 1)
 
-dt = 0.0001
+dt = 0.00001
 
 pi.write(CE, 1)
 sleep(dt)
@@ -35,13 +35,12 @@ while n < nbr:
     pi.write(CE, 0)
     sleep(dt)
 
-    # Envoi de 0b1111111111111111
     c, d = pi.spi_xfer(sensor, int.to_bytes(65535, 2, 'big'))
     if c == 2:
         val = (d[0] & 0b00111111) << 8 | d[1]
         angle = int(val/4)
 
-    if n % 2 == 0:
+    if n % 200 == 0:
         print(angle)
 
     pi.write(CE, 1)
@@ -57,4 +56,11 @@ sleep(1)
 """
 periode = 0.0019
 ~ 2 ms
+
+sans print à 1 000 000 Hz
+periode = 0.0013
+
+sans print à 3 000 000 Hz
+periode = 0.0012
+
 """
