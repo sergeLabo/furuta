@@ -40,8 +40,8 @@ while n < nbr:
         val = (d[0] & 0b00111111) << 8 | d[1]
         angle = int(val/4)
 
-    if n % 200 == 0:
-        print(angle)
+    # #if n % 20 == 0:
+        # #print(angle)
 
     pi.write(CE, 1)
 
@@ -49,18 +49,16 @@ while n < nbr:
 
 pi.stop()
 
-periode = ((time() - t0) / nbr) - tempo
-print("periode =", round(periode, 4))
+periode = (((time() - t0) / nbr) - tempo)*1000  # ms
+print("periode =", round(periode, 2), "ms")
 sleep(1)
 
 """
-periode = 0.0019
-~ 2 ms
+periode = 1.9 ms
+il y a quelques incohérences dans les valeurs
 
-sans print à 1 000 000 Hz
-periode = 0.0013
-
-sans print à 3 000 000 Hz
-periode = 0.0012
+sans print
+periode = 1.3 ms
+periode = 1.19 ms
 
 """
