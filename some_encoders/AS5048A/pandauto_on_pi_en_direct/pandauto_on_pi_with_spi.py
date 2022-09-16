@@ -23,6 +23,8 @@ sensor = pi.spi_open(0, 1000000, 1)
 
 dt = 0.00001
 
+pi.set_mode(CE, pigpio.INPUT)
+
 pi.write(CE, 1)
 sleep(dt)
 
